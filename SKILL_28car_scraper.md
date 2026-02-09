@@ -10,13 +10,20 @@
 - **檔案**: scraper_28car.py
 - **功能**: 自動爬取 28car.com 車輛列表頁面
 - **資料擷取**: 車輛名稱、價格、年份、賣家電話、發布日期
+- **價格追蹤**: 自動偵測價格變動，記錄舊價格與變動時間
+- **排程執行**: 每日早上 6:00 自動執行（Windows 工作排程 28car_daily）
 
-### 2. 聯絡人群組系統 (Contact Grouping)
+### 2. 價格變動追蹤
+- **欄位**: prev_price, prev_price_num, price_changed_at
+- **觸發條件**: 當車輛價格變動且舊價格 > 0 時記錄
+- **篩選功能**: 車輛列表、聯絡人目錄、活動系統皆可篩選「有價格更新」
+
+### 3. 聯絡人群組系統 (Contact Grouping)
 - **檔案**: migrate_db.py
 - **演算法**: Union-Find (並查集)
 - **功能**: 自動偵測重複聯絡人、建立電話號碼群組
 
-### 3. 賣家分類系統
+### 4. 賣家分類系統
 | 分類 | 車輛數量 | 說明 |
 |------|----------|------|
 | private | 1 | 私人賣家 |
@@ -25,22 +32,11 @@
 
 **手動修改分類**：可批量勾選聯絡人修改分類（標記 classification_manual=1 後爬蟲不覆蓋）
 
-### 4. 簡訊發送系統 (SMS Sender)
+### 5. 簡訊發送系統 (SMS Sender)
 - **檔案**: sms_sender.py
 - **API**: OneWaySMS 香港
 
-#### OneWaySMS API 回應碼
-| 代碼 | 說明 |
-|------|------|
-| >0 | 成功 |
-| -100 | 帳密錯誤 |
-| -200 | 發送者ID無效 |
-| -300 | 無效號碼 |
-| -400 | 語言類型無效 |
-| -500 | 訊息含無效字元 |
-| -600 | 餘額不足 |
-
-### 5. 登入系統 (Authentication)
+### 6. 登入系統 (Authentication)
 - **帳號類型**: 管理員 (admin) / 一般使用者 (user)
 - **預設帳號**: admin / admin（首次登入強制改密碼）
 - **Session**: Cookie Session，24 小時有效
@@ -54,65 +50,57 @@
 | 簡訊系統 | ✓ | ✗ |
 | 管理後台 | ✓ | ✗ |
 
-### 6. 管理後台
+### 7. 管理後台
 - **使用者管理**: 新增、編輯、刪除帳號
 - **操作日誌**: 系統操作記錄查詢
 - **網路資訊**: 區域網路連線網址
 
-### 7. 網頁管理介面
+### 8. 網頁管理介面
 - **檔案**: web_demo.py, index.html
 - **框架**: Flask
 - **網址**: http://localhost:5000
 - **區域網路**: http://[本機IP]:5000
 
-## API 端點
+### 9. 版本控制與遠端更新
+- **版控**: Git + GitHub
+- **倉庫**: https://github.com/GGC-svg/28car-system
+- **更新方式**: 執行「檢查更新.bat」自動拉取最新版本
 
-### 認證 API
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| /api/auth/login | POST | 登入 |
-| /api/auth/logout | POST | 登出 |
-| /api/auth/me | GET | 當前使用者 |
-| /api/auth/change-password | POST | 改密碼 |
+#### 納入版控的檔案
+- 核心程式：web_demo.py, scraper_28car.py, sms_sender.py, migrate_db.py
+- 前端：index.html
+- 批次檔：一鍵部署安裝.bat, 啟動伺服器.bat, 檢查更新.bat 等
+- 設定：requirements.txt, sms_config.json
 
-### 車輛/聯絡人 API（需登入）
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| /api/cars | GET | 車輛列表 |
-| /api/contacts | GET | 聯絡人列表 |
-| /api/contact/<id>/logs | POST | 新增溝通紀錄 |
-| /api/contacts/batch-classification | PUT | 批量修改分類 |
-| /api/stats | GET | 統計數據 |
-
-### 簡訊 API（僅管理員）
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| /api/sms/config | GET/POST | 簡訊設定 |
-| /api/sms/send-now | POST | 立即發送 |
-| /api/sms/logs | GET | 發送記錄 |
-
-### 管理後台 API（僅管理員）
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| /api/admin/users | GET/POST | 使用者管理 |
-| /api/admin/logs | GET | 操作日誌 |
-| /api/admin/network-info | GET | 網路資訊 |
-
-## 資料庫重要欄位
-
-### contact_groups
-- classification_manual: 手動分類標記（1=手動設定，爬蟲不覆蓋）
+#### 排除的檔案（不納入版控）
+- 資料庫 (*.db)
+- 圖片 (/images/)
+- 日誌 (*.log)
+- 編譯產物 (*.exe)
 
 ## 部署
 
-1. 複製 car2 資料夾到目標電腦
+### 新安裝
+1. 執行「首次安裝.bat」（自動從 GitHub 下載程式）
 2. 雙擊「一鍵部署安裝.bat」
 3. 首次登入 admin/admin，強制改密碼
-4. 其他電腦透過 http://[伺服器IP]:5000 連入
 
-## 版本: v1.1 (2026-02-09)
+### 更新程式
+1. 執行「檢查更新.bat」
+2. 如果有資料庫結構更新，執行 python migrate_db.py
 
-### 更新內容
+## 版本歷史
+
+### v1.2 (2026-02-10)
+- 新增價格變動追蹤功能（爬蟲自動偵測價格變化）
+- 新增「有價格更新」篩選（車輛列表、聯絡人目錄、活動系統）
+- 統一所有頁面篩選區排版（一排6個，超過換行）
+- 修復更新日期顯示格式錯誤
+- 新增 Git 版本控制與 GitHub 遠端倉庫
+- 新增「檢查更新.bat」遠端更新功能
+- 設定每日爬蟲排程（06:00 自動執行）
+
+### v1.1 (2026-02-09)
 - 新增登入系統（管理員/一般使用者）
 - 新增管理後台（使用者管理、操作日誌、網路資訊）
 - 新增區域網路連線功能
