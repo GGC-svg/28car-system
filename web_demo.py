@@ -1,0 +1,2225 @@
+"""
+28car Demo 網站 - 本地預覽 / 正式 Server
+==========================================
+開發: python web_demo.py
+正式: gunicorn -w 4 -b 0.0.0.0:5000 web_demo:app
+"""
+
+from flask import Flask, jsonify, send_from_directory, request, Response, make_response
+import sqlite3
+import os
+import json
+import csv
+import io
+import re
+import logging
+import hashlib
+import uuid
+import socket
+from functools import wraps
+from datetime import datetime, date, timedelta
+
+# ============================================================
+# 設定（支援環境變數覆蓋）
+# ============================================================
+BASE_DIR = os.environ.get('APP_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
+FLASK_HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
+FLASK_PORT = int(os.environ.get('FLASK_PORT', '5000'))
+FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+
+# SMS / Email 設定
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_FROM_NUMBER = os.environ.get('TWILIO_FROM_NUMBER', '')
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', '')
+
+app = Flask(__name__, static_folder=BASE_DIR)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+log = logging.getLogger(__name__)
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# ============================================================
+# 認證系統
+# ============================================================
+SESSION_COOKIE_NAME = '28car_session'
+SESSION_EXPIRE_HOURS = 24
+
+
+def hash_password(password, salt=None):
+    """密碼雜湊 (SHA-256 + salt)"""
+    if salt is None:
+        salt = os.urandom(16).hex()
+    password_hash = hashlib.sha256(f"{password}{salt}".encode()).hexdigest()
+    return f"{salt}:{password_hash}"
+
+
+def verify_password(password, stored_hash):
+    """驗證密碼"""
+    try:
+        salt, hash_val = stored_hash.split(':')
+        return hash_password(password, salt) == stored_hash
+    except:
+        return False
+
+
+def create_session(user_id, ip_address, user_agent):
+    """建立 Session"""
+    db = get_db()
+    session_id = str(uuid.uuid4())
+    now = datetime.now()
+    expires_at = (now + timedelta(hours=SESSION_EXPIRE_HOURS)).isoformat()
+
+    db.execute("""
+        INSERT INTO sessions (session_id, user_id, ip_address, user_agent, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (session_id, user_id, ip_address, user_agent, now.isoformat(), expires_at))
+    db.commit()
+    db.close()
+    return session_id
+
+
+def get_current_user():
+    """從 Cookie 取得當前使用者"""
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        return None
+
+    db = get_db()
+    now = datetime.now().isoformat()
+    row = db.execute("""
+        SELECT u.id, u.username, u.display_name, u.role, u.must_change_pwd
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.session_id = ? AND s.expires_at > ? AND u.is_active = 1
+    """, (session_id, now)).fetchone()
+    db.close()
+
+    if row:
+        return dict(row)
+    return None
+
+
+def log_operation(user_id, action, target_type=None, target_id=None, details=None):
+    """記錄操作日誌"""
+    try:
+        db = get_db()
+        username = None
+        if user_id:
+            user = db.execute('SELECT username FROM users WHERE id = ?', (user_id,)).fetchone()
+            if user:
+                username = user['username']
+
+        db.execute("""
+            INSERT INTO operation_logs (user_id, username, action, target_type, target_id, details, ip_address, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            username,
+            action,
+            target_type,
+            target_id,
+            json.dumps(details, ensure_ascii=False) if details else None,
+            request.remote_addr if request else None,
+            datetime.now().isoformat()
+        ))
+        db.commit()
+        db.close()
+    except Exception as e:
+        log.error(f"記錄操作日誌失敗: {e}")
+
+
+def login_required(f):
+    """登入驗證裝飾器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Unauthorized', 'code': 'LOGIN_REQUIRED'}), 401
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    """管理員驗證裝飾器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Unauthorized', 'code': 'LOGIN_REQUIRED'}), 401
+        if user['role'] != 'admin':
+            return jsonify({'error': 'Forbidden', 'code': 'ADMIN_REQUIRED'}), 403
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
+
+def restricted_api(f):
+    """限制一般帳號的 API（CRM/SMS 專用）"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Unauthorized', 'code': 'LOGIN_REQUIRED'}), 401
+        if user['role'] != 'admin':
+            return jsonify({'error': 'Forbidden', 'code': 'PERMISSION_DENIED'}), 403
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ============================================================
+# 認證 API
+# ============================================================
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """登入"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+
+    if not username or not password:
+        return jsonify({'error': '請輸入帳號密碼'}), 400
+
+    db = get_db()
+    user = db.execute(
+        'SELECT * FROM users WHERE username = ? AND is_active = 1',
+        (username,)
+    ).fetchone()
+    db.close()
+
+    if not user or not verify_password(password, user['password_hash']):
+        log_operation(None, 'LOGIN_FAILED', 'user', username, {'reason': 'invalid_credentials'})
+        return jsonify({'error': '帳號或密碼錯誤'}), 401
+
+    session_id = create_session(
+        user['id'],
+        request.remote_addr,
+        request.headers.get('User-Agent', '')
+    )
+
+    # 更新最後登入時間
+    db = get_db()
+    db.execute('UPDATE users SET last_login_at = ? WHERE id = ?',
+               (datetime.now().isoformat(), user['id']))
+    db.commit()
+    db.close()
+
+    log_operation(user['id'], 'LOGIN', 'user', str(user['id']), {})
+
+    resp = make_response(jsonify({
+        'success': True,
+        'user': {
+            'id': user['id'],
+            'username': user['username'],
+            'display_name': user['display_name'],
+            'role': user['role'],
+            'must_change_pwd': user['must_change_pwd']
+        }
+    }))
+    resp.set_cookie(SESSION_COOKIE_NAME, session_id,
+                    max_age=SESSION_EXPIRE_HOURS * 3600,
+                    httponly=True, samesite='Lax')
+    return resp
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    """登出"""
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    user = get_current_user()
+    if session_id:
+        db = get_db()
+        db.execute('DELETE FROM sessions WHERE session_id = ?', (session_id,))
+        db.commit()
+        db.close()
+
+    if user:
+        log_operation(user['id'], 'LOGOUT', 'user', str(user['id']), {})
+
+    resp = make_response(jsonify({'success': True}))
+    resp.delete_cookie(SESSION_COOKIE_NAME)
+    return resp
+
+
+@app.route('/api/auth/me')
+def api_auth_me():
+    """取得當前使用者資訊"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'authenticated': False})
+    return jsonify({
+        'authenticated': True,
+        'user': user
+    })
+
+
+@app.route('/api/auth/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    """更改密碼"""
+    data = request.get_json()
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+
+    if len(new_password) < 6:
+        return jsonify({'error': '新密碼至少需要6個字元'}), 400
+
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE id = ?',
+                      (request.current_user['id'],)).fetchone()
+
+    if not verify_password(old_password, user['password_hash']):
+        db.close()
+        return jsonify({'error': '舊密碼錯誤'}), 400
+
+    new_hash = hash_password(new_password)
+    db.execute("""
+        UPDATE users SET password_hash = ?, must_change_pwd = 0, updated_at = ?
+        WHERE id = ?
+    """, (new_hash, datetime.now().isoformat(), user['id']))
+    db.commit()
+    db.close()
+
+    log_operation(user['id'], 'CHANGE_PASSWORD', 'user', str(user['id']), {})
+
+    return jsonify({'success': True})
+
+
+
+# ============================================================
+# 車輛列表 API
+# ============================================================
+@app.route('/api/cars')
+@login_required
+def api_cars():
+    """車輛列表（支援搜尋、完整篩選、分頁、今日標記、聯絡人分類）"""
+    db = get_db()
+    today_str = date.today().isoformat()
+
+    source = request.args.get('source', '')
+    car_type = request.args.get('car_type', '')
+    make = request.args.get('make', '')
+    fuel = request.args.get('fuel', '')
+    seats = request.args.get('seats', '')
+    transmission = request.args.get('transmission', '')
+    year = request.args.get('year', '')
+    price_range = request.args.get('price_range', '')
+    search = request.args.get('q', '')
+    sort = request.args.get('sort', 'newest')
+    sold = request.args.get('sold', '0')
+    today_filter = request.args.get('today_filter', '')
+    contact_type = request.args.get('contact_type', '')
+    price_changed = request.args.get('price_changed', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 24))
+
+    where = []
+    params = []
+
+    if sold == '0':
+        where.append('c.is_sold = 0')
+    elif sold == '1':
+        where.append('c.is_sold = 1')
+
+    if source:
+        where.append('c.source = ?')
+        params.append(source)
+    if car_type:
+        where.append('c.car_type = ?')
+        params.append(car_type)
+    if make:
+        where.append('c.make = ?')
+        params.append(make)
+    if fuel:
+        where.append('c.fuel LIKE ?')
+        params.append(f'%{fuel}%')
+    if seats:
+        where.append('c.seats = ?')
+        params.append(seats)
+    if transmission:
+        where.append('c.transmission LIKE ?')
+        params.append(f'%{transmission}%')
+    if year:
+        where.append('c.year = ?')
+        params.append(year)
+    if price_range:
+        price_filter = _parse_price_range(price_range)
+        if price_filter:
+            where.append(price_filter[0].replace('price_num', 'c.price_num'))
+            params.extend(price_filter[1])
+    if search:
+        where.append('(c.make || c.model || c.description) LIKE ?')
+        params.append(f'%{search}%')
+
+    # 今日篩選
+    if today_filter == 'new':
+        where.append('c.first_seen >= ?')
+        params.append(today_str)
+    elif today_filter == 'updated':
+        where.append('c.scraped_at >= ? AND c.first_seen < ?')
+        params.extend([today_str, today_str])
+    elif today_filter == 'all_today':
+        where.append('(c.first_seen >= ? OR (c.scraped_at >= ? AND c.first_seen < ?))')
+        params.extend([today_str, today_str, today_str])
+
+    # 聯絡人分類篩選
+    if contact_type in ('dealer', 'broker', 'private'):
+        where.append('cg.classification = ?')
+        params.append(contact_type)
+
+    # 價格更新篩選
+    if price_changed == 'yes':
+        where.append('c.price_changed_at IS NOT NULL')
+
+    where_sql = ' AND '.join(where) if where else '1=1'
+
+    # updated_at 格式已轉為 YYYY-MM-DD HH:MM，可直接排序
+    order_map = {
+        'updated': 'c.updated_at DESC',
+        'newest': 'c.first_seen DESC',
+        'price_asc': 'c.price_num ASC',
+        'price_desc': 'c.price_num DESC',
+        'year_desc': 'c.year DESC',
+        'views': 'c.views DESC',
+    }
+    order_sql = order_map.get(sort, order_map['updated'])
+
+    base_query = f'''
+        FROM cars c
+        LEFT JOIN contact_groups cg ON c.contact_group_id = cg.group_id
+        WHERE {where_sql}
+    '''
+
+    count = db.execute(f'SELECT COUNT(*) {base_query}', params).fetchone()[0]
+
+    offset = (page - 1) * per_page
+    rows = db.execute(
+        f'SELECT c.*, cg.classification as contact_classification, cg.car_count as contact_car_count {base_query} ORDER BY {order_sql} LIMIT ? OFFSET ?',
+        params + [per_page, offset]
+    ).fetchall()
+
+    cars = []
+    for row in rows:
+        car = dict(row)
+        # 今日狀態
+        fs = car.get('first_seen', '') or ''
+        sa = car.get('scraped_at', '') or ''
+        if fs >= today_str:
+            car['today_status'] = 'new'
+        elif sa >= today_str:
+            car['today_status'] = 'updated'
+        else:
+            car['today_status'] = None
+
+        photos = db.execute(
+            'SELECT photo_index, local_path, downloaded FROM car_photos WHERE vid=? ORDER BY photo_index',
+            (car['vid'],)
+        ).fetchall()
+        car['photos'] = [dict(p) for p in photos]
+        cars.append(car)
+
+    # 今日統計
+    today_new = db.execute('SELECT COUNT(*) FROM cars WHERE first_seen >= ?', (today_str,)).fetchone()[0]
+    today_updated = db.execute(
+        'SELECT COUNT(*) FROM cars WHERE scraped_at >= ? AND first_seen < ?',
+        (today_str, today_str)
+    ).fetchone()[0]
+
+    db.close()
+
+    return jsonify({
+        'total': count,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (count + per_page - 1) // per_page,
+        'today_new': today_new,
+        'today_updated': today_updated,
+        'cars': cars,
+    })
+
+
+def _parse_price_range(price_range):
+    ranges = {
+        '1': ('price_num > 0 AND price_num <= ?', [30000]),
+        '2': ('price_num > ? AND price_num <= ?', [30000, 50000]),
+        '3': ('price_num > ? AND price_num <= ?', [50000, 100000]),
+        '4': ('price_num > ? AND price_num <= ?', [100000, 200000]),
+        '5': ('price_num > ? AND price_num <= ?', [200000, 400000]),
+        '6': ('price_num > ? AND price_num <= ?', [400000, 600000]),
+        '7': ('price_num > ? AND price_num <= ?', [600000, 800000]),
+        '8': ('price_num > ? AND price_num <= ?', [800000, 1000000]),
+        '9': ('price_num > ? AND price_num <= ?', [1000000, 2000000]),
+        '10': ('price_num > ?', [2000000]),
+    }
+    return ranges.get(price_range)
+
+
+# ============================================================
+# 車輛詳情 API
+# ============================================================
+@app.route('/api/car/<vid>')
+@login_required
+def api_car_detail(vid):
+    db = get_db()
+    today_str = date.today().isoformat()
+    row = db.execute('''
+        SELECT c.*, cg.classification as contact_classification,
+               cg.car_count as contact_car_count, cg.group_id as contact_group_id_info
+        FROM cars c
+        LEFT JOIN contact_groups cg ON c.contact_group_id = cg.group_id
+        WHERE c.vid = ?
+    ''', (vid,)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+    car = dict(row)
+    fs = car.get('first_seen', '') or ''
+    sa = car.get('scraped_at', '') or ''
+    if fs >= today_str:
+        car['today_status'] = 'new'
+    elif sa >= today_str:
+        car['today_status'] = 'updated'
+    else:
+        car['today_status'] = None
+    photos = db.execute(
+        'SELECT photo_index, local_path, original_url, downloaded FROM car_photos WHERE vid=? ORDER BY photo_index',
+        (vid,)
+    ).fetchall()
+    car['photos'] = [dict(p) for p in photos]
+    db.close()
+    return jsonify(car)
+
+
+# ============================================================
+# 統計 API
+# ============================================================
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    db = get_db()
+    today_str = date.today().isoformat()
+    stats = {}
+    stats['total'] = db.execute('SELECT COUNT(*) FROM cars').fetchone()[0]
+    stats['active'] = db.execute('SELECT COUNT(*) FROM cars WHERE is_sold=0').fetchone()[0]
+    stats['sold'] = db.execute('SELECT COUNT(*) FROM cars WHERE is_sold=1').fetchone()[0]
+    stats['with_photos'] = db.execute('SELECT COUNT(*) FROM cars WHERE photo_count>0').fetchone()[0]
+    stats['total_photos'] = db.execute('SELECT COUNT(*) FROM car_photos WHERE downloaded=1').fetchone()[0]
+    stats['detail_scraped'] = db.execute('SELECT COUNT(*) FROM cars WHERE detail_scraped=1').fetchone()[0]
+    stats['today_new'] = db.execute('SELECT COUNT(*) FROM cars WHERE first_seen >= ?', (today_str,)).fetchone()[0]
+    stats['today_updated'] = db.execute(
+        'SELECT COUNT(*) FROM cars WHERE scraped_at >= ? AND first_seen < ?',
+        (today_str, today_str)
+    ).fetchone()[0]
+
+    try:
+        source_rows = db.execute(
+            'SELECT source, COUNT(*) as cnt FROM cars WHERE is_sold=0 GROUP BY source ORDER BY cnt DESC'
+        ).fetchall()
+        stats['sources'] = [{'name': s[0] or 'sell', 'count': s[1]} for s in source_rows]
+    except Exception:
+        stats['sources'] = []
+
+    makes = db.execute(
+        'SELECT make, COUNT(*) as cnt FROM cars WHERE is_sold=0 GROUP BY make ORDER BY cnt DESC LIMIT 20'
+    ).fetchall()
+    stats['makes'] = [{'name': m[0], 'count': m[1]} for m in makes]
+
+    years = db.execute(
+        "SELECT year, COUNT(*) as cnt FROM cars WHERE is_sold=0 AND year != '' GROUP BY year ORDER BY year DESC LIMIT 20"
+    ).fetchall()
+    stats['years'] = [{'name': y[0], 'count': y[1]} for y in years]
+
+    fuels = db.execute(
+        "SELECT fuel, COUNT(*) as cnt FROM cars WHERE is_sold=0 AND fuel != '' GROUP BY fuel ORDER BY cnt DESC"
+    ).fetchall()
+    stats['fuels'] = [{'name': f[0], 'count': f[1]} for f in fuels]
+
+    db.close()
+    return jsonify(stats)
+
+
+# ============================================================
+# 爬蟲執行記錄 API
+# ============================================================
+@app.route('/api/scraper/runs')
+@login_required
+def api_scraper_runs():
+    """取得爬蟲執行記錄"""
+    db = get_db()
+    limit = int(request.args.get('limit', 10))
+
+    try:
+        rows = db.execute(
+            '''SELECT id, started_at, finished_at, status, sources,
+               total_pages, new_cars, updated_cars, unchanged_cars,
+               details_scraped, photos_downloaded, stale_marked, error_message
+               FROM scraper_runs ORDER BY started_at DESC LIMIT ?''',
+            (limit,)
+        ).fetchall()
+        runs = [dict(r) for r in rows]
+    except Exception:
+        runs = []
+
+    db.close()
+    return jsonify({'runs': runs})
+
+
+# ============================================================
+# 篩選選項 API
+# ============================================================
+@app.route('/api/filters')
+@login_required
+def api_filters():
+    db = get_db()
+
+    try:
+        sources = db.execute(
+            "SELECT DISTINCT source FROM cars WHERE is_sold=0 AND source IS NOT NULL AND source!='' ORDER BY source"
+        ).fetchall()
+        source_list = [s[0] for s in sources]
+    except Exception:
+        source_list = ['sell']
+
+    try:
+        car_types = db.execute(
+            "SELECT DISTINCT car_type FROM cars WHERE is_sold=0 AND car_type IS NOT NULL AND car_type!='' ORDER BY car_type"
+        ).fetchall()
+        car_type_list = [c[0] for c in car_types]
+    except Exception:
+        car_type_list = []
+
+    makes = db.execute("SELECT DISTINCT make FROM cars WHERE is_sold=0 AND make!='' ORDER BY make").fetchall()
+    years = db.execute("SELECT DISTINCT year FROM cars WHERE is_sold=0 AND year!='' ORDER BY year DESC").fetchall()
+    fuels = db.execute("SELECT DISTINCT fuel FROM cars WHERE is_sold=0 AND fuel!='' ORDER BY fuel").fetchall()
+    seats = db.execute(
+        "SELECT DISTINCT seats FROM cars WHERE is_sold=0 AND seats IS NOT NULL AND seats!='' ORDER BY CAST(seats AS INTEGER)"
+    ).fetchall()
+    transmissions = db.execute(
+        "SELECT DISTINCT transmission FROM cars WHERE is_sold=0 AND transmission IS NOT NULL AND transmission!='' ORDER BY transmission"
+    ).fetchall()
+
+    db.close()
+    return jsonify({
+        'sources': source_list,
+        'car_types': car_type_list,
+        'makes': [m[0] for m in makes],
+        'years': [y[0] for y in years],
+        'fuels': [f[0] for f in fuels],
+        'seats': [s[0] for s in seats],
+        'transmissions': [t[0] for t in transmissions],
+    })
+
+
+# ============================================================
+# 聯絡人目錄 API (Feature 2)
+# ============================================================
+@app.route('/api/contacts')
+@login_required
+def api_contacts():
+    """聯絡人目錄（車行/同行/私人，含溝通紀錄統計、簡訊統計、更新日期）"""
+    db = get_db()
+    classification = request.args.get('classification', '')
+    search = request.args.get('q', '')
+    sort = request.args.get('sort', 'car_count_desc')
+    has_logs = request.args.get('has_logs', '')
+    has_phone = request.args.get('has_phone', '')
+    intention = request.args.get('intention', '')
+    last_days = request.args.get('last_days', '')
+    contacted_by = request.args.get('contacted_by', '')
+    update_days = request.args.get('update_days', '')
+    price_changed = request.args.get('price_changed', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+
+    where = []
+    params = []
+
+    if classification:
+        where.append('cg.classification = ?')
+        params.append(classification)
+    if search:
+        where.append('(cg.canonical_name LIKE ? OR cg.canonical_phone LIKE ? OR cg.all_names LIKE ?)')
+        params.extend([f'%{search}%'] * 3)
+    if has_logs == 'yes':
+        where.append('log_count > 0')
+    elif has_logs == 'no':
+        where.append('(log_count IS NULL OR log_count = 0)')
+    if has_phone == 'yes':
+        where.append("cg.canonical_phone != ''")
+    if intention:
+        where.append('cg.intention_status = ?')
+        params.append(intention)
+    if last_days:
+        if last_days == 'never':
+            where.append('(cl.last_contacted_at IS NULL)')
+        else:
+            where.append(f"cl.last_contacted_at >= date('now', '-{last_days} days')")
+    if contacted_by:
+        where.append('lcb.last_contacted_by = ?')
+        params.append(contacted_by)
+    if update_days:
+        # 28car 格式是 DD/MMhh:mm，需要轉換來比較
+        # 使用 last_car_update 欄位，它來自 cars 表的 updated_at
+        where.append(f"cu.last_car_update >= date('now', '-{update_days} days')")
+    if price_changed == 'yes':
+        where.append('pc.price_changed_count > 0')
+
+    where_sql = ' AND '.join(where) if where else '1=1'
+
+    sort_map = {
+        'car_count_desc': 'cg.car_count DESC',
+        'car_count_asc': 'cg.car_count ASC',
+        'name_asc': 'cg.canonical_name ASC',
+        'last_contact': 'last_contacted_at DESC',
+        'log_count_desc': 'log_count DESC',
+        'last_update': 'last_car_update DESC',
+        'sms_count_desc': 'sms_count DESC',
+    }
+    order_sql = sort_map.get(sort, 'cg.car_count DESC')
+
+    base_query = f'''
+        FROM contact_groups cg
+        LEFT JOIN (
+            SELECT group_id,
+                   COUNT(*) as log_count,
+                   MAX(contacted_at) as last_contacted_at
+            FROM contact_logs GROUP BY group_id
+        ) cl ON cg.group_id = cl.group_id
+        LEFT JOIN (
+            SELECT l1.group_id, l1.contacted_by as last_contacted_by
+            FROM contact_logs l1
+            INNER JOIN (
+                SELECT group_id, MAX(contacted_at) as max_at
+                FROM contact_logs GROUP BY group_id
+            ) l2 ON l1.group_id = l2.group_id AND l1.contacted_at = l2.max_at
+        ) lcb ON cg.group_id = lcb.group_id
+        LEFT JOIN (
+            SELECT contact_group_id,
+                   MAX(updated_at) as last_car_update
+            FROM cars GROUP BY contact_group_id
+        ) cu ON cg.group_id = cu.contact_group_id
+        LEFT JOIN (
+            SELECT group_id,
+                   COUNT(*) as sms_count,
+                   MAX(sent_at) as last_sms_sent
+            FROM sms_logs WHERE status = 'success' GROUP BY group_id
+        ) sl ON cg.group_id = sl.group_id
+        LEFT JOIN (
+            SELECT contact_group_id,
+                   COUNT(*) as price_changed_count,
+                   MAX(price_changed_at) as last_price_change
+            FROM cars WHERE price_changed_at IS NOT NULL GROUP BY contact_group_id
+        ) pc ON cg.group_id = pc.contact_group_id
+        WHERE {where_sql}
+    '''
+
+    count = db.execute(f'SELECT COUNT(*) {base_query}', params).fetchone()[0]
+
+    offset = (page - 1) * per_page
+    rows = db.execute(
+        f'''SELECT cg.*,
+               COALESCE(cl.log_count, 0) as log_count,
+               cl.last_contacted_at,
+               lcb.last_contacted_by,
+               cu.last_car_update,
+               COALESCE(sl.sms_count, 0) as sms_count,
+               sl.last_sms_sent
+        {base_query} ORDER BY {order_sql} LIMIT ? OFFSET ?''',
+        params + [per_page, offset]
+    ).fetchall()
+
+    contacts = [dict(r) for r in rows]
+    db.close()
+
+    return jsonify({
+        'total': count,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (count + per_page - 1) // per_page,
+        'contacts': contacts,
+    })
+
+
+
+@app.route('/api/contacts/contacted-by-options')
+@login_required
+def api_contacted_by_options():
+    """獲取所有聯絡人選項"""
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT contacted_by FROM contact_logs WHERE contacted_by IS NOT NULL AND contacted_by != '' ORDER BY contacted_by"
+    ).fetchall()
+    db.close()
+    return jsonify({'options': [r[0] for r in rows]})
+
+
+@app.route('/api/contacts/export')
+@login_required
+def api_contacts_export():
+    """匯出聯絡人為 CSV"""
+    db = get_db()
+    classification = request.args.get('classification', '')
+    intention = request.args.get('intention', '')
+
+    where = []
+    params = []
+
+    if classification:
+        where.append('cg.classification = ?')
+        params.append(classification)
+    if intention:
+        where.append('cg.intention_status = ?')
+        params.append(intention)
+    if last_days:
+        if last_days == 'never':
+            where.append('(cl.last_contacted_at IS NULL)')
+        else:
+            where.append(f"cl.last_contacted_at >= date('now', '-{last_days} days')")
+    if contacted_by:
+        where.append('lcb.last_contacted_by = ?')
+        params.append(contacted_by)
+    if update_days:
+        # 28car 格式是 DD/MMhh:mm，需要轉換來比較
+        # 使用 last_car_update 欄位，它來自 cars 表的 updated_at
+        where.append(f"cu.last_car_update >= date('now', '-{update_days} days')")
+    if price_changed == 'yes':
+        where.append('pc.price_changed_count > 0')
+
+    where_sql = ' AND '.join(where) if where else '1=1'
+
+    rows = db.execute(f'''
+        SELECT cg.canonical_name, cg.canonical_phone, cg.classification, cg.car_count,
+               cg.intention_status, cg.email,
+               cu.last_car_update,
+               COALESCE(sl.sms_count, 0) as sms_count,
+               sl.last_sms_sent
+        FROM contact_groups cg
+        LEFT JOIN (
+            SELECT contact_group_id, MAX(updated_at) as last_car_update
+            FROM cars GROUP BY contact_group_id
+        ) cu ON cg.group_id = cu.contact_group_id
+        LEFT JOIN (
+            SELECT group_id, COUNT(*) as sms_count, MAX(sent_at) as last_sms_sent
+            FROM sms_logs WHERE status = 'success' GROUP BY group_id
+        ) sl ON cg.group_id = sl.group_id
+        WHERE {where_sql}
+        ORDER BY cg.car_count DESC
+    ''', params).fetchall()
+    db.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['姓名', '電話', '分類', '車輛數', '意願狀態', 'Email', '最後更新', '簡訊次數', '最後發送'])
+
+    classification_map = {'private': '私人', 'broker': '中間商', 'dealer': '車行'}
+    intention_map = {'willing': '有意願', 'unwilling': '無意願', 'sold': '車輛已售'}
+
+    for r in rows:
+        writer.writerow([
+            r[0] or '',
+            r[1] or '',
+            classification_map.get(r[2], r[2] or ''),
+            r[3] or 0,
+            intention_map.get(r[4], r[4] or ''),
+            r[5] or '',
+            r[6] or '',
+            r[7] or 0,
+            r[8] or ''
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=contacts.csv'}
+    )
+
+
+@app.route('/api/contact/<int:group_id>/intention', methods=['PUT'])
+@login_required
+def api_update_intention(group_id):
+    """更新聯絡人意願狀態"""
+    db = get_db()
+    data = request.get_json()
+    intention = data.get('intention_status', '')
+
+    if intention not in ('', 'willing', 'unwilling', 'sold'):
+        db.close()
+        return jsonify({'error': 'Invalid intention status'}), 400
+
+    db.execute('UPDATE contact_groups SET intention_status = ?, updated_at = ? WHERE group_id = ?',
+               (intention if intention else None, datetime.now().isoformat(), group_id))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/contacts/batch-classification', methods=['PUT'])
+@login_required
+def api_batch_update_classification():
+    """批量更新聯絡人分類"""
+    db = get_db()
+    data = request.get_json()
+
+    group_ids = data.get('group_ids', [])
+    classification = data.get('classification', '')
+
+    if not group_ids:
+        db.close()
+        return jsonify({'error': '未選擇聯絡人'}), 400
+
+    if classification not in ('private', 'broker', 'dealer'):
+        db.close()
+        return jsonify({'error': '無效的分類'}), 400
+
+    now = datetime.now().isoformat()
+
+    # 批量更新：設定 classification 和 classification_manual = 1
+    placeholders = ','.join(['?'] * len(group_ids))
+    db.execute(f"""
+        UPDATE contact_groups
+        SET classification = ?, classification_manual = 1, updated_at = ?
+        WHERE group_id IN ({placeholders})
+    """, [classification, now] + group_ids)
+
+    updated = db.total_changes
+    db.commit()
+
+    # 記錄操作日誌
+    log_operation(db, 'BATCH_UPDATE_CLASSIFICATION', 'contact_groups',
+                  ','.join(map(str, group_ids)),
+                  {'classification': classification, 'count': len(group_ids)})
+
+    db.close()
+    return jsonify({'status': 'ok', 'updated': updated})
+
+
+@app.route('/api/contacts/sync-to-crm', methods=['POST'])
+@login_required
+def api_sync_contacts_to_crm():
+    """將私人賣家同步到 CRM"""
+    db = get_db()
+    now = datetime.now().isoformat()
+
+    # 找出尚未匯入的私人賣家
+    rows = db.execute('''
+        SELECT cg.group_id, cg.canonical_name, cg.canonical_phone,
+               cg.car_count, cg.classification, cg.email, cg.intention_status
+        FROM contact_groups cg
+        WHERE cg.classification = 'private'
+          AND cg.canonical_phone != ''
+          AND cg.group_id NOT IN (SELECT COALESCE(group_id, 0) FROM crm_contacts)
+    ''').fetchall()
+
+    imported = 0
+    for r in rows:
+        db.execute('''
+            INSERT INTO crm_contacts
+            (group_id, contact_name, contact_phone, car_count, classification, email, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        ''', (r[0], r[1], r[2], r[3], r[4], r[5] or '', now, now))
+        imported += 1
+
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok', 'imported': imported})
+
+
+
+@app.route('/api/contact/<int:group_id>')
+@login_required
+def api_contact_detail(group_id):
+    """單一聯絡人詳情 + 車輛列表 + 溝通紀錄"""
+    db = get_db()
+    contact = db.execute('SELECT * FROM contact_groups WHERE group_id = ?', (group_id,)).fetchone()
+    if not contact:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+
+    result = dict(contact)
+
+    cars = db.execute(
+        'SELECT vid, car_no, make, model, year, price, price_num, source, updated_at FROM cars WHERE contact_group_id = ? ORDER BY first_seen DESC',
+        (group_id,)
+    ).fetchall()
+    result['cars'] = [dict(c) for c in cars]
+
+    logs = db.execute(
+        'SELECT * FROM contact_logs WHERE group_id = ? ORDER BY contacted_at DESC',
+        (group_id,)
+    ).fetchall()
+    result['logs'] = [dict(l) for l in logs]
+
+    db.close()
+    return jsonify(result)
+
+
+@app.route('/api/contact/<int:group_id>/logs', methods=['POST'])
+@login_required
+def api_add_contact_log(group_id):
+    """新增溝通紀錄"""
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    # 誰聯絡的自動帶入登入帳號的顯示名稱
+    contacted_by = request.current_user.get('display_name') or request.current_user.get('username')
+
+    db.execute('''
+        INSERT INTO contact_logs (group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        group_id,
+        contacted_by,
+        data.get('contact_method', ''),
+        data.get('content', ''),
+        data.get('contacted_at', now),
+        now, now
+    ))
+
+    # 如果有設定意願狀態，同時更新 contact_groups
+    intention_status = data.get('intention_status', '')
+    if intention_status:
+        db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
+                   (intention_status, group_id))
+
+    db.commit()
+    log_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+    db.close()
+    return jsonify({'status': 'ok', 'log_id': log_id})
+
+
+@app.route('/api/contact/log/<int:log_id>', methods=['PUT'])
+@login_required
+def api_update_contact_log(log_id):
+    """更新溝通紀錄"""
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    fields = []
+    params = []
+    for key in ('contact_method', 'content', 'contacted_at'):  # contacted_by 不可修改
+        if key in data:
+            fields.append(f'{key} = ?')
+            params.append(data[key])
+
+    if not fields:
+        db.close()
+        return jsonify({'error': 'no fields'}), 400
+
+    fields.append('updated_at = ?')
+    params.append(now)
+    params.append(log_id)
+    db.execute(f"UPDATE contact_logs SET {', '.join(fields)} WHERE id = ?", params)
+
+    # 如果有設定意願狀態，同時更新 contact_groups
+    intention_status = data.get('intention_status', '')
+    group_id = data.get('group_id')
+    if intention_status and group_id:
+        db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
+                   (intention_status, group_id))
+
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/contact/log/<int:log_id>', methods=['DELETE'])
+@login_required
+def api_delete_contact_log(log_id):
+    """刪除溝通紀錄"""
+    db = get_db()
+    db.execute('DELETE FROM contact_logs WHERE id = ?', (log_id,))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/contacts/rebuild', methods=['POST'])
+@login_required
+def api_rebuild_contacts():
+    """手動觸發聯絡人分組重建"""
+    from migrate_db import rebuild_contact_groups
+    db = get_db()
+    db.row_factory = None
+    rebuild_contact_groups(db)
+    db.close()
+    return jsonify({'status': 'ok', 'message': '聯絡人分組已重建'})
+
+
+# ============================================================
+# CRM API (Feature 3)
+# ============================================================
+@app.route('/api/crm/contacts')
+@restricted_api
+def api_crm_contacts():
+    """CRM 聯絡人列表"""
+    db = get_db()
+    status = request.args.get('status', '')
+    has_email = request.args.get('has_email', '')
+    search = request.args.get('q', '')
+    sort = request.args.get('sort', 'newest')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+
+    where = []
+    params = []
+
+    if status:
+        where.append('status = ?')
+        params.append(status)
+    if has_email == 'yes':
+        where.append("email IS NOT NULL AND email != ''")
+    elif has_email == 'no':
+        where.append("(email IS NULL OR email = '')")
+    if search:
+        where.append('(contact_name LIKE ? OR contact_phone LIKE ? OR email LIKE ?)')
+        params.extend([f'%{search}%'] * 3)
+
+    where_sql = ' AND '.join(where) if where else '1=1'
+
+    sort_map = {
+        'newest': 'created_at DESC',
+        'name': 'contact_name ASC',
+        'car_count': 'car_count DESC',
+        'last_sent': 'last_sent_at DESC',
+        'send_count': 'send_count DESC',
+    }
+    order_sql = sort_map.get(sort, 'created_at DESC')
+
+    count = db.execute(f'SELECT COUNT(*) FROM crm_contacts WHERE {where_sql}', params).fetchone()[0]
+
+    offset = (page - 1) * per_page
+    rows = db.execute(
+        f'SELECT * FROM crm_contacts WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?',
+        params + [per_page, offset]
+    ).fetchall()
+
+    db.close()
+    return jsonify({
+        'total': count,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (count + per_page - 1) // per_page,
+        'contacts': [dict(r) for r in rows],
+    })
+
+
+@app.route('/api/crm/contact/<int:contact_id>')
+@restricted_api
+def api_crm_contact_detail(contact_id):
+    db = get_db()
+    contact = db.execute('SELECT * FROM crm_contacts WHERE id = ?', (contact_id,)).fetchone()
+    if not contact:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+
+    result = dict(contact)
+
+    # 發送歷史
+    messages = db.execute(
+        'SELECT * FROM crm_messages WHERE contact_id = ? ORDER BY created_at DESC LIMIT 50',
+        (contact_id,)
+    ).fetchall()
+    result['messages'] = [dict(m) for m in messages]
+
+    # 相關車輛
+    if result.get('group_id'):
+        cars = db.execute(
+            'SELECT vid, car_no, make, model, year, price FROM cars WHERE contact_group_id = ? LIMIT 20',
+            (result['group_id'],)
+        ).fetchall()
+        result['cars'] = [dict(c) for c in cars]
+
+    db.close()
+    return jsonify(result)
+
+
+@app.route('/api/crm/contact/<int:contact_id>', methods=['PUT'])
+@restricted_api
+def api_crm_contact_update(contact_id):
+    """更新 CRM 聯絡人（email, notes, tags, status）"""
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    fields = []
+    params = []
+    for key in ('email', 'notes', 'tags', 'status'):
+        if key in data:
+            fields.append(f'{key} = ?')
+            params.append(data[key])
+
+    if not fields:
+        db.close()
+        return jsonify({'error': 'no fields to update'}), 400
+
+    fields.append('updated_at = ?')
+    params.append(now)
+    params.append(contact_id)
+
+    db.execute(f"UPDATE crm_contacts SET {', '.join(fields)} WHERE id = ?", params)
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/crm/contacts/import', methods=['POST'])
+@restricted_api
+def api_crm_import():
+    """從 contact_groups 匯入私人賣家到 CRM"""
+    db = get_db()
+    now = datetime.now().isoformat()
+
+    # 找出尚未匯入的私人賣家（有電話的）
+    rows = db.execute('''
+        SELECT cg.group_id, cg.canonical_name, cg.canonical_phone,
+               cg.car_count, cg.classification
+        FROM contact_groups cg
+        WHERE cg.classification = 'private'
+          AND cg.canonical_phone != ''
+          AND cg.group_id NOT IN (SELECT COALESCE(group_id, 0) FROM crm_contacts)
+    ''').fetchall()
+
+    imported = 0
+    for r in rows:
+        db.execute('''
+            INSERT INTO crm_contacts
+            (group_id, contact_name, contact_phone, car_count, classification, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (r[0], r[1], r[2], r[3], r[4], now, now))
+        imported += 1
+
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok', 'imported': imported})
+
+
+@app.route('/api/crm/contacts/export')
+@restricted_api
+def api_crm_export():
+    """匯出 CRM 聯絡人為 CSV"""
+    db = get_db()
+    rows = db.execute(
+        'SELECT contact_name, contact_phone, email, car_count, classification, status, send_count, last_sent_at, notes FROM crm_contacts ORDER BY contact_name'
+    ).fetchall()
+    db.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['姓名', '電話', 'Email', '車輛數', '分類', '狀態', '發送次數', '最後發送', '備註'])
+    for r in rows:
+        writer.writerow(list(r))
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=crm_contacts.csv'}
+    )
+
+
+# ============================================================
+# CRM 活動 API
+# ============================================================
+@app.route('/api/crm/campaigns')
+@restricted_api
+def api_crm_campaigns():
+    db = get_db()
+    rows = db.execute('SELECT * FROM crm_campaigns ORDER BY created_at DESC').fetchall()
+    db.close()
+    return jsonify({'campaigns': [dict(r) for r in rows]})
+
+
+@app.route('/api/crm/campaigns', methods=['POST'])
+@restricted_api
+def api_crm_campaign_create():
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    db.execute('''
+        INSERT INTO crm_campaigns (name, type, template, status, target_filter, created_at, updated_at)
+        VALUES (?, ?, ?, 'draft', ?, ?, ?)
+    ''', (data.get('name', ''), data.get('type', 'sms'), data.get('template', ''),
+          json.dumps(data.get('target_filter', {})), now, now))
+    db.commit()
+    campaign_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+    db.close()
+    return jsonify({'status': 'ok', 'campaign_id': campaign_id})
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>')
+@restricted_api
+def api_crm_campaign_detail(campaign_id):
+    db = get_db()
+    campaign = db.execute('SELECT * FROM crm_campaigns WHERE id = ?', (campaign_id,)).fetchone()
+    if not campaign:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+
+    result = dict(campaign)
+    msgs = db.execute(
+        'SELECT status, COUNT(*) as cnt FROM crm_messages WHERE campaign_id = ? GROUP BY status',
+        (campaign_id,)
+    ).fetchall()
+    result['message_stats'] = {m[0]: m[1] for m in msgs}
+
+    db.close()
+    return jsonify(result)
+
+
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>', methods=['PUT'])
+@restricted_api
+def api_crm_campaign_update(campaign_id):
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    fields = []
+    params = []
+    for key in ('name', 'type', 'template', 'target_filter', 'status'):
+        if key in data:
+            if key == 'target_filter':
+                fields.append(key + ' = ?')
+                params.append(json.dumps(data[key]))
+            else:
+                fields.append(key + ' = ?')
+                params.append(data[key])
+
+    if not fields:
+        db.close()
+        return jsonify({'error': 'no fields to update'}), 400
+
+    fields.append('updated_at = ?')
+    params.append(now)
+    params.append(campaign_id)
+
+    sql = "UPDATE crm_campaigns SET " + ', '.join(fields) + " WHERE id = ?"
+    db.execute(sql, params)
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>', methods=['DELETE'])
+@restricted_api
+def api_crm_campaign_delete(campaign_id):
+    db = get_db()
+    db.execute('DELETE FROM crm_messages WHERE campaign_id = ?', (campaign_id,))
+    db.execute('DELETE FROM crm_campaigns WHERE id = ?', (campaign_id,))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>/execute', methods=['POST'])
+@restricted_api
+def api_crm_campaign_execute(campaign_id):
+    db = get_db()
+    now = datetime.now().isoformat()
+    today = datetime.now().date().isoformat()
+
+    campaign = db.execute('SELECT * FROM crm_campaigns WHERE id = ?', (campaign_id,)).fetchone()
+    if not campaign:
+        db.close()
+        return jsonify({'error': 'campaign not found'}), 404
+
+    campaign = dict(campaign)
+
+    try:
+        target_filter = json.loads(campaign.get('target_filter') or '{}')
+    except:
+        target_filter = {}
+
+    where = ["cg.canonical_phone != ''"]
+    params = []
+
+    classification = target_filter.get('classification', '')
+    if classification:
+        where.append('cg.classification = ?')
+        params.append(classification)
+
+    intention = target_filter.get('intention', '')
+    if intention:
+        where.append('cg.intention_status = ?')
+        params.append(intention)
+
+    car_count = target_filter.get('car_count', '')
+    if car_count == '1':
+        where.append('cg.car_count = 1')
+    elif car_count == '2-4':
+        where.append('cg.car_count BETWEEN 2 AND 4')
+    elif car_count == '5+':
+        where.append('cg.car_count >= 5')
+
+    exclude_sent = target_filter.get('exclude_sent', 'yes')
+    if exclude_sent == 'yes':
+        where.append("cg.canonical_phone NOT IN (SELECT phone FROM sms_logs WHERE DATE(sent_at) = ? AND status IN ('success', 'pending'))")
+        params.append(today)
+
+    where_sql = ' AND '.join(where)
+    sql = "SELECT cg.group_id, cg.canonical_name, cg.canonical_phone, cg.car_count, cg.email FROM contact_groups cg WHERE " + where_sql + " LIMIT 1000"
+    rows = db.execute(sql, params).fetchall()
+
+    template = campaign.get('template', '')
+    msg_type = campaign.get('type', 'sms')
+
+    sent = 0
+    failed = 0
+
+    for r in rows:
+        contact = {
+            'group_id': r[0],
+            'contact_name': r[1],
+            'contact_phone': r[2],
+            'car_count': r[3],
+            'email': r[4] or ''
+        }
+
+        content_text = template
+        content_text = content_text.replace('{{name}}', contact.get('contact_name', ''))
+        content_text = content_text.replace('{{phone}}', contact.get('contact_phone', ''))
+        content_text = content_text.replace('{{car_count}}', str(contact.get('car_count', 0)))
+        content_text = content_text.replace('{{email}}', contact.get('email', ''))
+
+        recipient = contact.get('contact_phone', '') if msg_type == 'sms' else contact.get('email', '')
+
+        if not recipient:
+            failed += 1
+            continue
+
+        db.execute("INSERT INTO crm_messages (campaign_id, contact_id, type, recipient, content, status, created_at) VALUES (?, (SELECT id FROM crm_contacts WHERE group_id = ?), ?, ?, ?, 'pending', ?)",
+                   (campaign_id, contact['group_id'], msg_type, recipient, content_text, now))
+        sent += 1
+
+    db.execute("UPDATE crm_campaigns SET status = 'executing', total_targets = ?, updated_at = ? WHERE id = ?",
+               (sent + failed, now, campaign_id))
+
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok', 'queued': sent, 'skipped': failed})
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>/messages')
+@restricted_api
+def api_crm_campaign_messages(campaign_id):
+    db = get_db()
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+
+    total = db.execute('SELECT COUNT(*) FROM crm_messages WHERE campaign_id = ?', (campaign_id,)).fetchone()[0]
+    rows = db.execute(
+        'SELECT m.*, c.contact_name, c.contact_phone FROM crm_messages m LEFT JOIN crm_contacts c ON m.contact_id = c.id WHERE m.campaign_id = ? ORDER BY m.created_at DESC LIMIT ? OFFSET ?',
+        (campaign_id, per_page, offset)
+    ).fetchall()
+
+    db.close()
+    return jsonify({
+        'total': total,
+        'page': page,
+        'messages': [dict(r) for r in rows],
+    })
+
+
+@app.route('/api/crm/campaign/<int:campaign_id>/send', methods=['POST'])
+@restricted_api
+def api_crm_campaign_send(campaign_id):
+    """執行活動發送"""
+    db = get_db()
+    now = datetime.now().isoformat()
+
+    campaign = db.execute('SELECT * FROM crm_campaigns WHERE id = ?', (campaign_id,)).fetchone()
+    if not campaign:
+        db.close()
+        return jsonify({'error': 'campaign not found'}), 404
+
+    campaign = dict(campaign)
+    data = request.get_json() or {}
+    contact_ids = data.get('contact_ids', [])
+
+    if not contact_ids:
+        db.close()
+        return jsonify({'error': 'no contacts selected'}), 400
+
+    template = campaign.get('template', '')
+    msg_type = campaign.get('type', 'sms')
+
+    sent = 0
+    failed = 0
+
+    for cid in contact_ids:
+        contact = db.execute('SELECT * FROM crm_contacts WHERE id = ?', (cid,)).fetchone()
+        if not contact:
+            continue
+        contact = dict(contact)
+
+        # 渲染模板
+        content = _render_template(template, contact)
+        recipient = contact.get('contact_phone', '') if msg_type == 'sms' else contact.get('email', '')
+
+        if not recipient:
+            # 建立失敗記錄
+            db.execute('''
+                INSERT INTO crm_messages (campaign_id, contact_id, type, recipient, content, status, error_message, created_at)
+                VALUES (?, ?, ?, ?, ?, 'failed', '無收件人', ?)
+            ''', (campaign_id, cid, msg_type, '', content, now))
+            failed += 1
+            continue
+
+        # 發送
+        success = False
+        external_id = ''
+        error_msg = ''
+
+        if msg_type == 'sms':
+            success, result = _send_sms(recipient, content)
+            if success:
+                external_id = result
+            else:
+                error_msg = result
+        elif msg_type == 'email':
+            subject = campaign.get('name', '28car 通知')
+            success, result = _send_email(recipient, subject, content)
+            if not success:
+                error_msg = result
+
+        status = 'sent' if success else 'failed'
+        db.execute('''
+            INSERT INTO crm_messages (campaign_id, contact_id, type, recipient, content, status, external_id, error_message, sent_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (campaign_id, cid, msg_type, recipient, content, status,
+              external_id, error_msg, now if success else None, now))
+
+        # 更新聯絡人
+        db.execute('''
+            UPDATE crm_contacts SET send_count = send_count + 1, last_sent_at = ?, updated_at = ? WHERE id = ?
+        ''', (now, now, cid))
+
+        if success:
+            sent += 1
+        else:
+            failed += 1
+
+    # 更新活動統計
+    db.execute('''
+        UPDATE crm_campaigns SET
+            status = 'completed',
+            sent_count = sent_count + ?,
+            failed_count = failed_count + ?,
+            total_targets = total_targets + ?,
+            updated_at = ?
+        WHERE id = ?
+    ''', (sent, failed, len(contact_ids), now, campaign_id))
+
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok', 'sent': sent, 'failed': failed})
+
+
+@app.route('/api/crm/config')
+@restricted_api
+def api_crm_config():
+    """檢查 SMS/Email 設定狀態"""
+    return jsonify({
+        'sms_configured': bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER),
+        'email_configured': bool(SMTP_HOST and SMTP_USER),
+    })
+
+
+# ============================================================
+# SMS / Email 發送
+# ============================================================
+def _send_sms(to_phone, body):
+    if not TWILIO_ACCOUNT_SID:
+        return False, 'Twilio 未設定'
+    try:
+        from twilio.rest import Client
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        if not to_phone.startswith('+'):
+            to_phone = '+852' + to_phone
+        message = client.messages.create(body=body, from_=TWILIO_FROM_NUMBER, to=to_phone)
+        return True, message.sid
+    except Exception as e:
+        return False, str(e)
+
+
+def _send_email(to_email, subject, body):
+    if not SMTP_HOST:
+        return False, 'SMTP 未設定'
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText(body, 'plain', 'utf-8')
+        msg['Subject'] = subject
+        msg['From'] = SMTP_FROM
+        msg['To'] = to_email
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def _render_template(template, contact):
+    """替換模板佔位符"""
+    result = template
+    result = result.replace('{{name}}', contact.get('contact_name', ''))
+    result = result.replace('{{phone}}', contact.get('contact_phone', ''))
+    result = result.replace('{{car_count}}', str(contact.get('car_count', 0)))
+    result = result.replace('{{email}}', contact.get('email', '') or '')
+    return result
+
+
+# ============================================================
+# 圖片靜態文件
+# ============================================================
+@app.route('/images/<path:filename>')
+def serve_image(filename):
+    return send_from_directory(os.path.join(BASE_DIR, 'images'), filename)
+
+
+# ============================================================
+# SMS 簡訊系統 API
+# ============================================================
+
+@app.route('/api/sms/templates')
+@restricted_api
+def api_sms_templates():
+    """取得簡訊模板列表"""
+    db = get_db()
+    rows = db.execute('SELECT * FROM sms_templates ORDER BY is_active DESC, id DESC').fetchall()
+    db.close()
+    return jsonify({'templates': [dict(r) for r in rows]})
+
+
+@app.route('/api/sms/templates', methods=['POST'])
+@restricted_api
+def api_sms_template_create():
+    """新增簡訊模板"""
+    db = get_db()
+    data = request.get_json() or {}
+    name = data.get('name', '').strip()
+    content = data.get('content', '').strip()
+
+    if not name or not content:
+        db.close()
+        return jsonify({'error': 'name and content required'}), 400
+
+    now = datetime.now().isoformat()
+    c = db.cursor()
+    # 先將其他模板停用，新模板設為啟用
+    c.execute('UPDATE sms_templates SET is_active = 0')
+    c.execute('INSERT INTO sms_templates (name, content, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
+              (name, content, now, now))
+    db.commit()
+    template_id = c.lastrowid
+    db.close()
+    return jsonify({'success': True, 'id': template_id})
+
+
+@app.route('/api/sms/templates/<int:template_id>', methods=['PUT'])
+@restricted_api
+def api_sms_template_update(template_id):
+    """更新簡訊模板"""
+    db = get_db()
+    data = request.get_json() or {}
+    name = data.get('name', '').strip()
+    content = data.get('content', '').strip()
+    is_active = data.get('is_active', 1)
+
+    if not name or not content:
+        db.close()
+        return jsonify({'error': 'name and content required'}), 400
+
+    now = datetime.now().isoformat()
+    db.execute('UPDATE sms_templates SET name=?, content=?, is_active=?, updated_at=? WHERE id=?',
+               (name, content, is_active, now, template_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+
+@app.route('/api/sms/templates/<int:template_id>', methods=['DELETE'])
+@restricted_api
+def api_sms_template_delete(template_id):
+    """刪除簡訊模板"""
+    db = get_db()
+    db.execute('DELETE FROM sms_templates WHERE id=?', (template_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+
+@app.route('/api/sms/templates/<int:template_id>/activate', methods=['POST'])
+@restricted_api
+def api_sms_template_activate(template_id):
+    """設為啟用模板（其他模板取消啟用）"""
+    db = get_db()
+    db.execute('UPDATE sms_templates SET is_active = 0')
+    db.execute('UPDATE sms_templates SET is_active = 1 WHERE id = ?', (template_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+
+@app.route('/api/sms/logs')
+@restricted_api
+def api_sms_logs():
+    """取得簡訊發送記錄"""
+    db = get_db()
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    status = request.args.get('status', '')
+    date_filter = request.args.get('date', '')
+
+    where = []
+    params = []
+
+    if status:
+        where.append('sl.status = ?')
+        params.append(status)
+    if date_filter:
+        where.append('DATE(sl.sent_at) = ?')
+        params.append(date_filter)
+
+    where_sql = ' AND '.join(where) if where else '1=1'
+    offset = (page - 1) * per_page
+
+    total = db.execute(f'SELECT COUNT(*) FROM sms_logs sl WHERE {where_sql}', params).fetchone()[0]
+    rows = db.execute(f'''
+        SELECT sl.*, cg.canonical_name, st.name as template_name
+        FROM sms_logs sl
+        LEFT JOIN contact_groups cg ON sl.group_id = cg.group_id
+        LEFT JOIN sms_templates st ON sl.template_id = st.id
+        WHERE {where_sql}
+        ORDER BY sl.sent_at DESC
+        LIMIT ? OFFSET ?
+    ''', params + [per_page, offset]).fetchall()
+
+    db.close()
+    return jsonify({
+        'logs': [dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'total_pages': (total + per_page - 1) // per_page,
+    })
+
+
+@app.route('/api/sms/stats')
+@restricted_api
+def api_sms_stats():
+    """取得簡訊統計"""
+    db = get_db()
+    today = datetime.now().date().isoformat()
+
+    stats = {}
+
+    # 總發送數
+    stats['total_sent'] = db.execute('SELECT COUNT(*) FROM sms_logs').fetchone()[0]
+    stats['total_success'] = db.execute("SELECT COUNT(*) FROM sms_logs WHERE status='success'").fetchone()[0]
+    stats['total_failed'] = db.execute("SELECT COUNT(*) FROM sms_logs WHERE status='failed'").fetchone()[0]
+
+    # 今日發送數
+    stats['today_sent'] = db.execute('SELECT COUNT(*) FROM sms_logs WHERE DATE(sent_at) = ?', (today,)).fetchone()[0]
+    stats['today_success'] = db.execute("SELECT COUNT(*) FROM sms_logs WHERE DATE(sent_at) = ? AND status='success'", (today,)).fetchone()[0]
+
+    # 最近一次發送任務
+    last_run = db.execute('SELECT * FROM sms_daily_runs ORDER BY started_at DESC LIMIT 1').fetchone()
+    stats['last_run'] = dict(last_run) if last_run else None
+
+    # 目前啟用模板
+    active_template = db.execute('SELECT id, name FROM sms_templates WHERE is_active = 1 LIMIT 1').fetchone()
+    stats['active_template'] = dict(active_template) if active_template else None
+
+    # 待發送的私人賣家數量
+    stats['pending_private'] = db.execute('''
+        SELECT COUNT(*) FROM contact_groups
+        WHERE classification = 'private'
+        AND canonical_phone IS NOT NULL AND canonical_phone != ''
+        AND canonical_phone NOT IN (
+            SELECT phone FROM sms_logs WHERE DATE(sent_at) = ? AND status IN ('success', 'pending')
+        )
+    ''', (today,)).fetchone()[0]
+
+    db.close()
+    return jsonify(stats)
+
+
+@app.route('/api/sms/daily-runs')
+@restricted_api
+def api_sms_daily_runs():
+    """取得每日發送記錄"""
+    db = get_db()
+    limit = int(request.args.get('limit', 30))
+    rows = db.execute('SELECT * FROM sms_daily_runs ORDER BY run_date DESC LIMIT ?', (limit,)).fetchall()
+    db.close()
+    return jsonify({'runs': [dict(r) for r in rows]})
+
+
+@app.route('/api/sms/config')
+@restricted_api
+def api_sms_config():
+    """取得 SMS 設定（不含密碼）"""
+    config_path = os.path.join(BASE_DIR, 'sms_config.json')
+    if not os.path.exists(config_path):
+        return jsonify({'error': 'config not found'}), 404
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    # 隱藏密碼
+    if 'onewaysms' in config:
+        config['onewaysms']['api_password'] = '******' if config['onewaysms'].get('api_password') else ''
+
+    return jsonify(config)
+
+
+@app.route('/api/sms/config', methods=['PUT'])
+@restricted_api
+def api_sms_config_update():
+    """更新 SMS 設定"""
+    config_path = os.path.join(BASE_DIR, 'sms_config.json')
+
+    # 讀取現有設定
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    else:
+        config = {'onewaysms': {}, 'settings': {}}
+
+    data = request.get_json() or {}
+
+    # 更新 onewaysms 設定
+    if 'onewaysms' in data:
+        for key in ['enabled', 'api_url', 'api_username', 'sender_id', 'language_type']:
+            if key in data['onewaysms']:
+                config['onewaysms'][key] = data['onewaysms'][key]
+        # 密碼只有在非 ****** 時才更新
+        if data['onewaysms'].get('api_password') and data['onewaysms']['api_password'] != '******':
+            config['onewaysms']['api_password'] = data['onewaysms']['api_password']
+
+    # 更新 settings
+    if 'settings' in data:
+        for key in ['daily_limit', 'target_classification', 'send_window_start', 'send_window_end', 'delay_between_sms']:
+            if key in data['settings']:
+                config['settings'][key] = data['settings'][key]
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=4)
+
+    return jsonify({'success': True})
+
+
+
+
+@app.route('/api/sms/source-stats')
+@restricted_api
+def api_sms_source_stats():
+    """取得各發送來源的統計數量"""
+    db = get_db()
+    today = datetime.now().date().isoformat()
+
+    stats = {}
+
+    # 私人賣家數量
+    private_count = db.execute("""
+        SELECT COUNT(*) FROM contact_groups cg
+        WHERE cg.classification = 'private'
+          AND cg.canonical_phone IS NOT NULL
+          AND cg.canonical_phone != ''
+          AND cg.canonical_phone NOT IN (
+              SELECT phone FROM sms_logs
+              WHERE DATE(sent_at) = ? AND status IN ('success', 'pending')
+          )
+    """, (today,)).fetchone()[0]
+    stats['private'] = private_count
+
+    # 今日新增/更新的私人賣家
+    today_new_count = db.execute("""
+        SELECT COUNT(DISTINCT cg.group_id) FROM contact_groups cg
+        INNER JOIN cars c ON c.contact_group_id = cg.group_id
+        WHERE cg.classification = 'private'
+          AND cg.canonical_phone IS NOT NULL
+          AND cg.canonical_phone != ''
+          AND (DATE(c.scraped_at) = ? OR DATE(c.updated_at) = ?)
+          AND cg.canonical_phone NOT IN (
+              SELECT phone FROM sms_logs
+              WHERE DATE(sent_at) = ? AND status IN ('success', 'pending')
+          )
+    """, (today, today, today)).fetchone()[0]
+    stats['today_new'] = today_new_count
+
+    stats['crm_campaign'] = 0
+    db.close()
+    return jsonify(stats)
+
+
+@app.route('/api/sms/send-now', methods=['POST'])
+@restricted_api
+def api_sms_send_now():
+    """立即發送簡訊"""
+    import subprocess
+    import sys
+
+    data = request.get_json() or {}
+    config_path = os.path.join(BASE_DIR, 'sms_config.json')
+
+    if not os.path.exists(config_path):
+        return jsonify({'success': False, 'error': '設定檔不存在'}), 400
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    if not config.get('onewaysms', {}).get('api_username'):
+        return jsonify({'success': False, 'error': 'API 帳號未設定'}), 400
+
+    if not config.get('onewaysms', {}).get('api_password'):
+        return jsonify({'success': False, 'error': 'API 密碼未設定'}), 400
+
+    try:
+        sms_script = os.path.join(BASE_DIR, 'sms_sender.py')
+        subprocess.Popen(
+            [sys.executable, sms_script, '--daily'],
+            cwd=BASE_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return jsonify({'success': True, 'message': '簡訊發送任務已啟動'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================
+# 管理後台 API
+# ============================================================
+@app.route('/api/admin/users')
+@admin_required
+def api_admin_users():
+    """取得使用者列表"""
+    db = get_db()
+    users = db.execute('''
+        SELECT id, username, display_name, role, is_active, must_change_pwd,
+               last_login_at, created_at, updated_at
+        FROM users ORDER BY id
+    ''').fetchall()
+    db.close()
+    return jsonify({'users': [dict(u) for u in users]})
+
+
+@app.route('/api/admin/users', methods=['POST'])
+@admin_required
+def api_admin_create_user():
+    """新增使用者"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    display_name = data.get('display_name', '').strip() or username
+    role = data.get('role', 'user')
+    must_change_pwd = data.get('must_change_pwd', 1)
+
+    if not username or not password:
+        return jsonify({'error': '請輸入帳號和密碼'}), 400
+
+    if len(password) < 6:
+        return jsonify({'error': '密碼至少需要6個字元'}), 400
+
+    if role not in ('admin', 'user'):
+        role = 'user'
+
+    db = get_db()
+    existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+    if existing:
+        db.close()
+        return jsonify({'error': '帳號已存在'}), 400
+
+    now = datetime.now().isoformat()
+    password_hash = hash_password(password)
+    db.execute('''
+        INSERT INTO users (username, password_hash, display_name, role, is_active, must_change_pwd, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    ''', (username, password_hash, display_name, role, must_change_pwd, now, now))
+    db.commit()
+    user_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+    db.close()
+
+    log_operation(request.current_user['id'], 'CREATE_USER', 'user', str(user_id),
+                  {'username': username, 'role': role})
+
+    return jsonify({'success': True, 'user_id': user_id})
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@admin_required
+def api_admin_update_user(user_id):
+    """更新使用者"""
+    data = request.get_json()
+    db = get_db()
+
+    user = db.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        db.close()
+        return jsonify({'error': '使用者不存在'}), 404
+
+    updates = []
+    params = []
+    changes = {}
+
+    if 'display_name' in data:
+        updates.append('display_name = ?')
+        params.append(data['display_name'])
+        changes['display_name'] = data['display_name']
+
+    if 'role' in data and data['role'] in ('admin', 'user'):
+        updates.append('role = ?')
+        params.append(data['role'])
+        changes['role'] = data['role']
+
+    if 'is_active' in data:
+        updates.append('is_active = ?')
+        params.append(1 if data['is_active'] else 0)
+        changes['is_active'] = data['is_active']
+
+    if 'password' in data and data['password']:
+        if len(data['password']) < 6:
+            db.close()
+            return jsonify({'error': '密碼至少需要6個字元'}), 400
+        updates.append('password_hash = ?')
+        params.append(hash_password(data['password']))
+        updates.append('must_change_pwd = ?')
+        params.append(data.get('must_change_pwd', 0))
+        changes['password_changed'] = True
+
+    if 'must_change_pwd' in data and 'password' not in data:
+        updates.append('must_change_pwd = ?')
+        params.append(1 if data['must_change_pwd'] else 0)
+        changes['must_change_pwd'] = data['must_change_pwd']
+
+    if updates:
+        updates.append('updated_at = ?')
+        params.append(datetime.now().isoformat())
+        params.append(user_id)
+        db.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+        db.commit()
+
+        log_operation(request.current_user['id'], 'UPDATE_USER', 'user', str(user_id), changes)
+
+    db.close()
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_user(user_id):
+    """刪除使用者"""
+    db = get_db()
+
+    user = db.execute('SELECT username FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        db.close()
+        return jsonify({'error': '使用者不存在'}), 404
+
+    if user['username'] == 'admin':
+        db.close()
+        return jsonify({'error': '無法刪除預設管理員帳號'}), 400
+
+    db.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+    db.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    db.commit()
+    db.close()
+
+    log_operation(request.current_user['id'], 'DELETE_USER', 'user', str(user_id),
+                  {'username': user['username']})
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/logs')
+@admin_required
+def api_admin_logs():
+    """操作日誌查詢"""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    action = request.args.get('action', '')
+    username = request.args.get('username', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    db = get_db()
+    where = []
+    params = []
+
+    if action:
+        where.append('action = ?')
+        params.append(action)
+    if username:
+        where.append('username LIKE ?')
+        params.append(f'%{username}%')
+    if date_from:
+        where.append('created_at >= ?')
+        params.append(date_from)
+    if date_to:
+        where.append('created_at <= ?')
+        params.append(date_to + 'T23:59:59')
+
+    where_sql = 'WHERE ' + ' AND '.join(where) if where else ''
+
+    total = db.execute(f'SELECT COUNT(*) FROM operation_logs {where_sql}', params).fetchone()[0]
+
+    offset = (page - 1) * per_page
+    logs = db.execute(f'''
+        SELECT * FROM operation_logs {where_sql}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    ''', params + [per_page, offset]).fetchall()
+
+    db.close()
+
+    return jsonify({
+        'logs': [dict(l) for l in logs],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+
+@app.route('/api/admin/settings')
+@admin_required
+def api_admin_settings():
+    """取得系統設定"""
+    db = get_db()
+    settings = db.execute('SELECT key, value, description, updated_at FROM system_settings').fetchall()
+    db.close()
+    return jsonify({'settings': {s['key']: {'value': s['value'], 'description': s['description'], 'updated_at': s['updated_at']} for s in settings}})
+
+
+@app.route('/api/admin/settings', methods=['PUT'])
+@admin_required
+def api_admin_update_settings():
+    """更新系統設定"""
+    data = request.get_json()
+    db = get_db()
+    now = datetime.now().isoformat()
+    changes = {}
+
+    for key, value in data.items():
+        existing = db.execute('SELECT key FROM system_settings WHERE key = ?', (key,)).fetchone()
+        if existing:
+            db.execute('UPDATE system_settings SET value = ?, updated_by = ?, updated_at = ? WHERE key = ?',
+                      (value, request.current_user['id'], now, key))
+        else:
+            db.execute('INSERT INTO system_settings (key, value, updated_by, updated_at) VALUES (?, ?, ?, ?)',
+                      (key, value, request.current_user['id'], now))
+        changes[key] = value
+
+    db.commit()
+    db.close()
+
+    log_operation(request.current_user['id'], 'UPDATE_SETTINGS', 'settings', None, changes)
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/network-info')
+@admin_required
+def api_admin_network_info():
+    """取得區域網路資訊"""
+    hostname = socket.gethostname()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = '127.0.0.1'
+
+    return jsonify({
+        'hostname': hostname,
+        'local_ip': local_ip,
+        'port': 5000,
+        'url': f'http://{local_ip}:5000'
+    })
+
+
+# ============================================================
+# 伺服器管理 API
+# ============================================================
+
+@app.route('/api/server/health')
+def api_server_health():
+    """健康檢查端點"""
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0'
+    })
+
+
+@app.route('/api/server/restart', methods=['POST'])
+def api_server_restart():
+    """重啟伺服器"""
+    import subprocess
+    import sys
+    import threading
+
+    def restart_server():
+        import time
+        time.sleep(1)  # 等待回應發送完成
+
+        # 啟動新的伺服器進程
+        if os.name == 'nt':  # Windows
+            exe_path = os.path.join(BASE_DIR, '28car_server.exe')
+            if os.path.exists(exe_path):
+                subprocess.Popen(['start', '', exe_path], shell=True, cwd=BASE_DIR)
+            else:
+                subprocess.Popen(['start', '', 'python', os.path.join(BASE_DIR, 'web_demo.py')],
+                               shell=True, cwd=BASE_DIR)
+        else:  # Linux/Mac
+            subprocess.Popen([sys.executable, os.path.join(BASE_DIR, 'web_demo.py')],
+                           cwd=BASE_DIR, start_new_session=True)
+
+        # 終止當前進程
+        os._exit(0)
+
+    # 在背景執行重啟
+    threading.Thread(target=restart_server, daemon=True).start()
+
+    return jsonify({
+        'status': 'restarting',
+        'message': '伺服器正在重啟，請稍候...'
+    })
+
+
+# ============================================================
+# 主頁面
+# ============================================================
+@app.route('/')
+def index():
+    return send_from_directory(BASE_DIR, 'index.html')
+
+
+if __name__ == '__main__':
+    print("=" * 50)
+    print("  28car Demo 網站")
+    print(f"  http://localhost:{FLASK_PORT}")
+    print("=" * 50)
+    app.run(host=FLASK_HOST, port=FLASK_PORT, debug=FLASK_DEBUG)

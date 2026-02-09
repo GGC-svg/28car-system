@@ -1,0 +1,4569 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>28car 車源資料庫</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "PingFang TC", "Segoe UI", sans-serif; 
+  background: linear-gradient(135deg, #C7EDCC 0%, #81C784 100%);
+  background-attachment: fixed;
+  color:#333; 
+  min-height: 100vh;
+}
+
+/* Header - Premium Design */
+.header { 
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #1a1a2e;
+  padding: 20px 0;
+  position: sticky; 
+  top: 0; 
+  z-index: 100; 
+  box-shadow: 0 4px 30px rgba(0,0,0,.1);
+  border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header h1 { 
+  font-size: 24px; 
+  font-weight: 700;
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header .subtitle { 
+  font-size: 13px; 
+  color: #666;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 2px solid #e0e0e0;
+}
+
+/* Stats Bar - Premium */
+.stats-bar { 
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  padding: 20px 0;
+  display: flex; 
+  justify-content: center;
+  gap: 32px; 
+  flex-wrap: wrap; 
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 20px rgba(0,0,0,.05);
+}
+.stat-item { 
+  text-align: center;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #f1f8e9 0%, #fff 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(76,175,80,0.1);
+  min-width: 100px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(76,175,80,0.15);
+}
+.stat-num { 
+  font-size: 26px; 
+  font-weight: 800; 
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-num.green { 
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.stat-num.blue { 
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.stat-label { font-size: 11px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+/* Tab Nav - Premium */
+.tab-nav { 
+  display: flex; 
+  justify-content: center;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  padding: 0;
+  gap: 8px;
+}
+.tab-btn { 
+  padding: 16px 32px; 
+  border: none; 
+  background: none; 
+  cursor: pointer; 
+  font-size: 14px; 
+  font-weight: 500;
+  color: #666; 
+  border-bottom: 3px solid transparent; 
+  transition: all 0.2s;
+  position: relative;
+}
+.tab-btn:hover { 
+  color: #4CAF50;
+  background: rgba(76,175,80,0.05);
+}
+.tab-btn.active { 
+  color: #4CAF50;
+  font-weight: 600; 
+  border-bottom-color: #4CAF50;
+  background: rgba(76,175,80,0.08);
+}
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* Filter Bar - Premium (統一排版：一排6個，超過換行) */
+.filter-bar {
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(10px);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.filter-bar select, .filter-bar input {
+  padding: 10px 12px;
+  border: 2px solid #e8e8e8;
+  border-radius: 10px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s;
+  background: #fff;
+  flex: 0 0 calc((100% - 50px) / 6);
+  min-width: 130px;
+  max-width: 180px;
+}
+.filter-bar select:focus, .filter-bar input:focus {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 4px rgba(76,175,80,0.1);
+}
+.filter-bar input[type=text] {
+  flex: 0 0 calc((100% - 50px) / 6);
+  min-width: 160px;
+  max-width: 200px;
+}
+.filter-bar .btn {
+  flex: 0 0 auto;
+  min-width: 70px;
+}
+
+/* Buttons - Premium */
+.btn { 
+  padding: 10px 20px; 
+  border: none; 
+  border-radius: 8px; 
+  font-size: 13px; 
+  font-weight: 600;
+  cursor: pointer; 
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  color: #fff; 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(76,175,80,0.3);
+}
+.btn:hover { 
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76,175,80,0.4);
+}
+.btn-outline { 
+  background: transparent; 
+  border: 2px solid #4CAF50; 
+  color: #4CAF50;
+  box-shadow: none;
+}
+.btn-outline:hover { 
+  background: rgba(76,175,80,0.1);
+  transform: translateY(-2px);
+}
+.btn-secondary {
+  background: #f0f0f0;
+  color: #555;
+  box-shadow: none;
+}
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-green { background: linear-gradient(135deg, #11998e, #38ef7d); box-shadow: 0 4px 15px rgba(17,153,142,0.3); }
+.btn-green:hover { box-shadow: 0 6px 20px rgba(17,153,142,0.4); }
+.btn-orange { background: linear-gradient(135deg, #f093fb, #f5576c); box-shadow: 0 4px 15px rgba(245,87,108,0.3); }
+.btn-orange:hover { box-shadow: 0 6px 20px rgba(245,87,108,0.4); }
+.btn-red { background: linear-gradient(135deg, #ff416c, #ff4b2b); box-shadow: 0 4px 15px rgba(255,65,108,0.3); }
+.btn-red:hover { box-shadow: 0 6px 20px rgba(255,65,108,0.4); }
+.btn-gray { background: #666; box-shadow: none; }
+.btn-gray:hover { background: #555; }
+
+/* Badges - Premium */
+.badge { 
+  display: inline-block; 
+  padding: 4px 10px; 
+  border-radius: 6px; 
+  font-size: 11px; 
+  font-weight: 600; 
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-new { 
+  background: linear-gradient(135deg, rgba(17,153,142,0.15), rgba(56,239,125,0.15));
+  color: #11998e;
+  border: 1px solid rgba(17,153,142,0.2);
+}
+.badge-updated { 
+  background: linear-gradient(135deg, rgba(79,172,254,0.15), rgba(0,242,254,0.15));
+  color: #1976d2;
+  border: 1px solid rgba(79,172,254,0.2);
+}
+.badge-broker { 
+  background: linear-gradient(135deg, rgba(240,147,251,0.15), rgba(245,87,108,0.15));
+  color: #e65100;
+  border: 1px solid rgba(245,87,108,0.2);
+}
+.badge-dealer { 
+  background: linear-gradient(135deg, rgba(255,65,108,0.15), rgba(255,75,43,0.15));
+  color: #c62828;
+  border: 1px solid rgba(255,65,108,0.2);
+}
+.badge-private { 
+  background: #f3f4f6; 
+  color: #666;
+  border: 1px solid #e0e0e0;
+}
+
+/* Scraper status */
+.scraper-status { background:#f8f9fa; border-radius:8px; padding:12px 16px; margin:0 auto 15px; font-size:13px; border-left:4px solid #1a73e8; max-width:1400px; width:calc(100% - 40px); }
+.scraper-status.success { border-left-color:#1b7f37; }
+.scraper-status.error { border-left-color:#c62828; }
+.scraper-status.running { border-left-color:#f9a825; }
+.scraper-status .status-label { font-weight:600; margin-right:8px; }
+.scraper-status .status-success { color:#1b7f37; }
+.scraper-status .status-error { color:#c62828; }
+.scraper-status .status-running { color:#f9a825; }
+.scraper-status .scraper-stats { color:#666; margin-left:12px; }
+
+/* Log entries */
+.log-entry { background:#f8f9fa; border-radius:8px; padding:12px 14px; margin-bottom:8px; border-left:3px solid #1a73e8; position:relative; }
+.log-entry:hover { background:#f0f4ff; }
+.log-meta { font-size:12px; color:#888; margin-bottom:4px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.log-meta b { color:#555; }
+.log-content { font-size:13px; line-height:1.6; white-space:pre-wrap; }
+.log-actions { position:absolute; top:8px; right:10px; display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+.log-entry:hover .log-actions { opacity:1; }
+.log-actions button { padding:2px 8px; font-size:11px; border:1px solid #ddd; background:#fff; border-radius:4px; cursor:pointer; }
+.log-actions button:hover { background:#e3f2fd; }
+.log-actions button.del:hover { background:#ffebee; color:#c62828; }
+.method-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:11px; font-weight:600; }
+.method-tag.m-phone { background:#e8f5e9; color:#2e7d32; }
+.method-tag.m-sms { background:#e3f2fd; color:#1565c0; }
+.method-tag.m-email { background:#fff3e0; color:#e65100; }
+.method-tag.m-whatsapp { background:#e8f5e9; color:#1b5e20; }
+.method-tag.m-visit { background:#f3e5f5; color:#7b1fa2; }
+.method-tag.m-other { background:#f5f5f5; color:#666; }
+
+/* Grid - Premium */
+.container { 
+  max-width: 1400px; 
+  margin: 0 auto; 
+  padding: 24px;
+}
+.main-content {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px auto;
+  max-width: 1400px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.1);
+}
+.car-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px; }
+
+/* Card - Premium */
+.car-card { 
+  background: #fff; 
+  border-radius: 16px; 
+  overflow: hidden; 
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+  cursor: pointer; 
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+.car-card:hover { 
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(102,126,234,0.2);
+}
+.card-img { width:100%; height:200px; object-fit:cover; background:#e8e8e8; display:block; }
+.card-img-placeholder { width:100%; height:200px; background:#e0e7f1; display:flex; align-items:center; justify-content:center; color:#8aa; font-size:48px; }
+.card-body { padding:14px; }
+.card-title { font-size:15px; font-weight:700; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card-make { color:#1a73e8; }
+.card-badges { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; min-height:0; }
+.card-specs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.spec-tag { background:#f0f4ff; color:#3367d6; padding:2px 8px; border-radius:4px; font-size:11px; }
+.spec-tag.src-sell { background:#e8f5e9; color:#2e7d32; }
+.spec-tag.src-cmy { background:#fff3e0; color:#e65100; }
+.card-price { font-size:20px; font-weight:700; color:#e84118; }
+.card-desc { font-size:12px; color:#777; margin-top:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.5; }
+.card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:#aaa; }
+
+/* Modal - Premium */
+.modal-overlay { 
+  display: none; 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%; 
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 200; 
+  justify-content: center; 
+  align-items: flex-start; 
+  padding: 40px; 
+  overflow-y: auto;
+}
+.modal-overlay.active { display: flex; }
+.modal { 
+  background: #fff; 
+  border-radius: 20px; 
+  max-width: 800px; 
+  width: 100%; 
+  max-height: 90vh; 
+  overflow-y: auto;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.3);
+  animation: modalSlideIn 0.3s ease-out;
+}
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-header { 
+  padding: 20px 24px; 
+  border-bottom: 1px solid #eee; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  position: sticky; 
+  top: 0; 
+  background: #fff; 
+  z-index: 1; 
+  border-radius: 20px 20px 0 0;
+}
+.modal-header h2 { 
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.modal-close { 
+  font-size: 28px; 
+  cursor: pointer; 
+  color: #999; 
+  border: none; 
+  background: #f5f5f5; 
+  padding: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.modal-close:hover { 
+  color: #333;
+  background: #eee;
+}
+.modal-body { padding: 24px; }
+
+/* Photo Gallery */
+.gallery { margin-bottom:20px; }
+.gallery-main { width:100%; height:360px; object-fit:contain; background:#111; border-radius:8px; display:block; }
+.gallery-thumbs { display:flex; gap:8px; margin-top:8px; overflow-x:auto; }
+.gallery-thumb { width:72px; height:54px; object-fit:cover; border-radius:6px; cursor:pointer; border:2px solid transparent; opacity:.7; transition:all .15s; flex-shrink:0; }
+.gallery-thumb:hover, .gallery-thumb.active { opacity:1; border-color:#1a73e8; }
+
+/* Detail specs */
+.detail-specs { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#eee; border-radius:8px; overflow:hidden; margin-bottom:16px; }
+.detail-spec { background:#fff; padding:10px 14px; }
+.detail-spec .label { font-size:11px; color:#999; }
+.detail-spec .value { font-size:14px; font-weight:600; margin-top:2px; }
+.detail-desc { background:#f8f9fa; border-radius:8px; padding:14px; margin-bottom:16px; line-height:1.8; font-size:14px; }
+.detail-contact { background:#e8f5e9; border-radius:8px; padding:14px; font-size:15px; margin-bottom:12px; }
+.detail-contact b { color:#2e7d32; }
+
+/* Data Table - Premium */
+.data-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  background: #fff; 
+  border-radius: 12px; 
+  overflow: hidden; 
+  box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+.data-table th { 
+  background: linear-gradient(135deg, #f1f8e9 0%, #fff 100%);
+  padding: 14px 16px; 
+  text-align: left; 
+  font-size: 11px; 
+  color: #4CAF50;
+  font-weight: 700; 
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid rgba(76,175,80,0.1);
+  white-space: nowrap;
+}
+.data-table td { 
+  padding: 12px 16px; 
+  font-size: 13px; 
+  border-bottom: 1px solid #f5f5f5;
+  transition: background 0.15s;
+}
+.data-table tr:hover td { 
+  background: rgba(102,126,234,0.04);
+}
+.data-table tr.clickable { cursor: pointer; }
+.data-table input[type=checkbox] { 
+  width: 18px; 
+  height: 18px; 
+  cursor: pointer;
+  accent-color: #4CAF50;
+}
+
+/* Toolbar */
+.toolbar { display:flex; justify-content:space-between; align-items:center; padding:12px 0; flex-wrap:wrap; gap:8px; }
+.toolbar-left { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.toolbar-right { display:flex; gap:8px; align-items:center; }
+
+/* Form */
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:600; color:#555; margin-bottom:4px; }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:13px; outline:none; font-family:inherit; }
+.form-group textarea { height:100px; resize:vertical; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#1a73e8; }
+
+/* Bulk action bar */
+.bulk-bar { background:#1a73e8; color:#fff; padding:10px 16px; border-radius:8px; margin-bottom:16px; display:none; justify-content:space-between; align-items:center; }
+.bulk-bar.active { display:flex; }
+.bulk-bar .btn { background:rgba(255,255,255,.2); } .bulk-bar .btn:hover { background:rgba(255,255,255,.3); }
+
+/* CRM sub-tabs */
+.sub-nav { display:flex; gap:0; padding:0 24px; background:#fafafa; border-bottom:1px solid #e0e0e0; }
+.sub-btn { padding:10px 20px; border:none; background:none; cursor:pointer; font-size:13px; color:#666; border-bottom:2px solid transparent; }
+.sub-btn:hover { color:#333; }
+.sub-btn.active { color:#1a73e8; font-weight:600; border-bottom-color:#1a73e8; }
+.sub-content { display:none; }
+.sub-content.active { display:block; }
+
+/* Campaign card */
+.campaign-card { background:#fff; border-radius:8px; padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; }
+.campaign-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); }
+.campaign-card h3 { font-size:15px; margin-bottom:4px; }
+.campaign-card .meta { font-size:12px; color:#999; }
+.campaign-stats-row { display:flex; gap:16px; margin-top:8px; }
+.campaign-stat { text-align:center; }
+.campaign-stat .num { font-size:18px; font-weight:700; color:#1a73e8; }
+.campaign-stat .lbl { font-size:11px; color:#999; }
+
+/* Info / Warn banners */
+.info-banner { background:#e3f2fd; border:1px solid #90caf9; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#1565c0; }
+.warn-banner { background:#fff3e0; border:1px solid #ffcc80; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#e65100; }
+
+/* Status dot */
+.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+.status-dot.st-new { background:#1b7f37; }
+.status-dot.st-contacted { background:#1565c0; }
+.status-dot.st-replied { background:#e65100; }
+.status-dot.st-not_interested { background:#999; }
+
+/* Pagination - Premium */
+.pagination { 
+  display: flex; 
+  justify-content: center; 
+  gap: 8px; 
+  margin: 24px 0;
+}
+.page-btn { 
+  padding: 10px 16px; 
+  border: 2px solid #e8e8e8; 
+  border-radius: 10px; 
+  background: #fff; 
+  cursor: pointer; 
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.page-btn:hover { 
+  background: rgba(76,175,80,0.1);
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+.page-btn.active { 
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  color: #fff; 
+  border-color: transparent;
+  box-shadow: 0 4px 15px rgba(76,175,80,0.3);
+}
+.page-btn:disabled { 
+  opacity: 0.4; 
+  cursor: not-allowed;
+}
+
+.loading { text-align:center; padding:60px; color:#999; font-size:16px; }
+.empty { text-align:center; padding:60px; color:#aaa; }
+
+/* Source option hover */
+.source-option:hover {
+  background: rgba(255,255,255,0.25) !important;
+  transform: translateY(-2px);
+}
+.source-option.selected {
+  border-color: rgba(255,255,255,0.8) !important;
+}
+
+/* Premium card style */
+.premium-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Time display in header */
+#headerTime {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Restart Modal */
+.restart-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(5px);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+}
+.restart-modal.show { display: flex; }
+.restart-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: modalSlideIn 0.3s ease;
+}
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.restart-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.restart-icon svg { stroke: white; }
+.restart-icon.spinning svg {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.restart-icon.success {
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+}
+.restart-icon.error {
+  background: linear-gradient(135deg, #eb3349, #f45c43);
+}
+.restart-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+.restart-message {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+}
+.restart-progress {
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.restart-progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #2E7D32, #4CAF50);
+  width: 0%;
+  transition: width 0.3s;
+}
+.restart-buttons { display: flex; gap: 12px; justify-content: center; }
+
+/* ==================== Dark Mode ==================== */
+body.dark-mode {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #e0e0e0;
+}
+
+body.dark-mode .header {
+  background: rgba(26, 26, 46, 0.95);
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+
+body.dark-mode .header h1 {
+  background: linear-gradient(135deg, #81C784, #4CAF50);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+body.dark-mode .header .subtitle {
+  color: #aaa;
+  border-left-color: #444;
+}
+
+body.dark-mode .user-info {
+  background: rgba(129, 199, 132, 0.15);
+}
+
+body.dark-mode .user-info .user-name {
+  color: #e0e0e0;
+}
+
+body.dark-mode .btn-logout {
+  color: #e0e0e0;
+  border-color: rgba(255,255,255,0.2);
+}
+
+body.dark-mode .btn-logout:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+}
+
+body.dark-mode .stats-bar {
+  background: rgba(26, 26, 46, 0.95);
+  border-bottom-color: rgba(255,255,255,0.05);
+}
+
+body.dark-mode .stat-item {
+  background: linear-gradient(135deg, #2d2d44 0%, #1a1a2e 100%);
+  border-color: rgba(76,175,80,0.2);
+}
+
+body.dark-mode .stat-label {
+  color: #888;
+}
+
+body.dark-mode .tab-nav {
+  background: rgba(26, 26, 46, 0.9);
+  border-bottom-color: rgba(255,255,255,0.05);
+}
+
+body.dark-mode .tab-btn {
+  color: #aaa;
+}
+
+body.dark-mode .tab-btn:hover {
+  color: #81C784;
+  background: rgba(76,175,80,0.1);
+}
+
+body.dark-mode .tab-btn.active {
+  color: #81C784;
+  border-bottom-color: #4CAF50;
+  background: rgba(76,175,80,0.15);
+}
+
+body.dark-mode .filter-bar {
+  background: rgba(26, 26, 46, 0.8);
+}
+
+body.dark-mode .filter-bar select,
+body.dark-mode .filter-bar input {
+  background: #2d2d44;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+body.dark-mode .filter-bar select:focus,
+body.dark-mode .filter-bar input:focus {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 4px rgba(76,175,80,0.2);
+}
+
+body.dark-mode .container {
+  background: rgba(26, 26, 46, 0.6);
+}
+
+body.dark-mode .car-card {
+  background: #2d2d44;
+  border-color: rgba(255,255,255,0.1);
+}
+
+body.dark-mode .car-card:hover {
+  border-color: rgba(76,175,80,0.3);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+body.dark-mode .car-card .car-title {
+  color: #fff;
+}
+
+body.dark-mode .car-card .car-price {
+  color: #81C784;
+}
+
+body.dark-mode .car-card .car-meta {
+  color: #888;
+}
+
+body.dark-mode .modal-overlay {
+  background: rgba(0,0,0,0.8);
+}
+
+body.dark-mode .modal {
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+body.dark-mode .modal-header {
+  background: #2d2d44;
+  border-bottom-color: #444;
+}
+
+body.dark-mode .modal-body {
+  background: #1a1a2e;
+}
+
+body.dark-mode input[type="text"],
+body.dark-mode input[type="password"],
+body.dark-mode input[type="number"],
+body.dark-mode input[type="time"],
+body.dark-mode textarea,
+body.dark-mode select {
+  background: #2d2d44 !important;
+  border-color: #444 !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-mode .btn-secondary {
+  background: #3d3d5c;
+  color: #e0e0e0;
+}
+
+body.dark-mode .btn-outline {
+  border-color: #4CAF50;
+  color: #81C784;
+}
+
+body.dark-mode table {
+  background: #2d2d44;
+}
+
+body.dark-mode th {
+  background: #1a1a2e;
+  color: #81C784;
+  border-color: #444;
+}
+
+body.dark-mode td {
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+body.dark-mode tr:hover td {
+  background: rgba(76,175,80,0.1);
+}
+
+/* Dark mode specific backgrounds for sections */
+body.dark-mode div[style*="background:#fff"],
+body.dark-mode div[style*="background: #fff"],
+body.dark-mode div[style*="background:white"] {
+  background: #2d2d44 !important;
+}
+
+body.dark-mode div[style*="background:#f8f9fa"],
+body.dark-mode div[style*="background: #f8f9fa"] {
+  background: #1a1a2e !important;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  background: rgba(76,175,80,0.15);
+  border: 2px solid rgba(76,175,80,0.3);
+  color: #4CAF50;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.theme-toggle:hover {
+  background: rgba(76,175,80,0.25);
+  transform: translateY(-1px);
+}
+
+body.dark-mode .theme-toggle {
+  background: rgba(129,199,132,0.15);
+  border-color: rgba(129,199,132,0.3);
+  color: #81C784;
+}
+
+
+/* Dark mode - Scraper Status */
+body.dark-mode .scraper-status {
+  background: #2d2d44;
+  color: #e0e0e0;
+}
+body.dark-mode .scraper-status .scraper-stats {
+  color: #aaa;
+}
+
+/* Dark mode - General text fixes */
+body.dark-mode .container {
+  color: #e0e0e0;
+}
+
+body.dark-mode div[style*="background:#fff"],
+body.dark-mode div[style*="background: #fff"] {
+  background: #2d2d44 !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-mode div[style*="background:#f8f9fa"],
+body.dark-mode div[style*="background: #f8f9fa"],
+body.dark-mode div[style*="background:#f1f8e9"] {
+  background: #1a1a2e !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-mode h3, body.dark-mode h4 {
+  color: #e0e0e0;
+}
+
+body.dark-mode label {
+  color: #ccc;
+}
+
+body.dark-mode .empty {
+  color: #888;
+}
+
+body.dark-mode .loading {
+  color: #aaa;
+}
+
+/* Dark mode - SMS Center Hero */
+body.dark-mode .sms-hero {
+  background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%) !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+}
+
+/* Dark mode - SMS Cards (templates, API config) */
+body.dark-mode .sms-card {
+  background: #2d2d44 !important;
+  color: #e0e0e0 !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+}
+body.dark-mode .sms-card h3 {
+  color: #e0e0e0 !important;
+}
+body.dark-mode .sms-card input,
+body.dark-mode .sms-card textarea,
+body.dark-mode .sms-card select {
+  background: #1a1a2e !important;
+  border-color: #444 !important;
+  color: #e0e0e0 !important;
+}
+
+/* Dark mode - Source options in SMS hero */
+body.dark-mode .source-option {
+  background: rgba(255,255,255,0.1) !important;
+}
+body.dark-mode .source-option:hover {
+  background: rgba(255,255,255,0.15) !important;
+}
+
+/* Dark mode - Log entries */
+body.dark-mode .log-entry {
+  background: #2d2d44 !important;
+  border-left-color: #4a7c59 !important;
+}
+body.dark-mode .log-entry:hover {
+  background: #363652 !important;
+}
+body.dark-mode .log-entry .log-meta span {
+  color: #ccc;
+}
+body.dark-mode .log-entry .log-content {
+  color: #aaa;
+}
+
+/* Dark mode - Log form */
+body.dark-mode .log-form {
+  background: #1a2e1a !important;
+}
+body.dark-mode .log-form input,
+body.dark-mode .log-form select,
+body.dark-mode .log-form textarea {
+  background: #1a1a2e !important;
+  border-color: #444 !important;
+  color: #e0e0e0 !important;
+}
+body.dark-mode .log-form label {
+  color: #ccc !important;
+}
+
+/* Dark mode - Car Detail specs table */
+body.dark-mode .detail-specs {
+  background: #444 !important;
+}
+body.dark-mode .detail-spec {
+  background: #2d2d44 !important;
+}
+body.dark-mode .detail-spec .label {
+  color: #aaa !important;
+}
+body.dark-mode .detail-spec .value {
+  color: #e0e0e0 !important;
+}
+body.dark-mode .detail-desc {
+  background: #1a1a2e !important;
+  color: #ccc !important;
+}
+body.dark-mode .detail-contact {
+  background: #1a2e1a !important;
+  color: #e0e0e0 !important;
+}
+body.dark-mode .detail-contact b {
+  color: #81C784 !important;
+}
+
+/* Dark mode - SMS Template items */
+body.dark-mode .template-item {
+  background: #1a1a2e !important;
+  border-color: #444 !important;
+}
+body.dark-mode .template-item.active {
+  background: #1a2e1a !important;
+  border-color: #2d5a3d !important;
+}
+body.dark-mode .template-item b {
+  color: #e0e0e0;
+}
+body.dark-mode .template-item .template-content {
+  color: #aaa !important;
+}
+
+/* ============================================================
+   登入系統 CSS
+   ============================================================ */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.login-overlay.hidden { display: none; }
+.login-box {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  padding: 48px;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+  width: 400px;
+  max-width: 90vw;
+}
+.login-box h2 {
+  text-align: center;
+  margin-bottom: 8px;
+  font-size: 28px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.login-box .subtitle {
+  text-align: center;
+  color: #888;
+  margin-bottom: 32px;
+  font-size: 14px;
+}
+.login-form .form-group {
+  margin-bottom: 20px;
+}
+.login-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+.login-form input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-form input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102,126,234,0.1);
+}
+.login-form .btn-login {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.login-form .btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+}
+.login-form .btn-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.login-error {
+  background: #fee;
+  color: #c00;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  display: none;
+}
+.login-error.show { display: block; }
+
+/* 使用者資訊 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(102,126,234,0.1);
+  border-radius: 20px;
+}
+.user-info .user-name {
+  font-weight: 600;
+  color: #333;
+}
+.user-info .user-role {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #667eea;
+  color: white;
+  border-radius: 10px;
+}
+.user-info .user-role.admin {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+.btn-logout {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.btn-logout:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+/* 強制改密碼 Modal */
+.pwd-change-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.pwd-change-modal.hidden { display: none; }
+.pwd-change-box {
+  background: white;
+  padding: 32px;
+  border-radius: 16px;
+  width: 400px;
+  max-width: 90vw;
+}
+.pwd-change-box h3 {
+  margin-bottom: 8px;
+  color: #c00;
+}
+.pwd-change-box .hint {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* 管理後台按鈕 */
+.btn-admin {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-admin:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(240,147,251,0.4);
+}
+
+
+/* 管理後台 CSS */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.admin-table th,
+.admin-table td {
+  padding: 12px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+.admin-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+}
+.admin-table tr:hover {
+  background: #f5f5f5;
+}
+.admin-table .role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.admin-table .role-badge.admin {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+}
+.admin-table .role-badge.user {
+  background: #e0e0e0;
+  color: #666;
+}
+.admin-table .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.admin-table .status-badge.active {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+.admin-table .status-badge.inactive {
+  background: #ffcdd2;
+  color: #c62828;
+}
+.admin-table .action-btns {
+  display: flex;
+  gap: 6px;
+}
+.admin-table .action-btns button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.network-info-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 24px;
+  border-radius: 16px;
+}
+.network-info-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 8px;
+}
+.info-label {
+  width: 120px;
+  color: #666;
+  font-size: 13px;
+}
+.info-value {
+  font-size: 15px;
+  font-weight: 500;
+}
+.add-user-form {
+  background: #e3f2fd;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.add-user-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- 登入遮罩 -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-box">
+    <h2>28car 車源資料庫</h2>
+    <p class="subtitle">請登入以繼續使用系統</p>
+    <div id="loginError" class="login-error"></div>
+    <form class="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>帳號</label>
+        <input type="text" id="loginUsername" placeholder="請輸入帳號" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>密碼</label>
+        <input type="password" id="loginPassword" placeholder="請輸入密碼" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login" id="loginBtn">登入</button>
+    </form>
+  </div>
+</div>
+
+<!-- 強制改密碼 Modal -->
+<div id="pwdChangeModal" class="pwd-change-modal hidden">
+  <div class="pwd-change-box">
+    <h3>⚠️ 首次登入請更改密碼</h3>
+    <p class="hint">為了您的帳號安全，請設定新的密碼</p>
+    <div id="pwdChangeError" class="login-error"></div>
+    <form class="login-form" onsubmit="handleChangePassword(event)">
+      <div class="form-group">
+        <label>舊密碼</label>
+        <input type="password" id="oldPassword" placeholder="請輸入目前密碼" required>
+      </div>
+      <div class="form-group">
+        <label>新密碼</label>
+        <input type="password" id="newPassword" placeholder="至少6個字元" required minlength="6">
+      </div>
+      <div class="form-group">
+        <label>確認新密碼</label>
+        <input type="password" id="confirmPassword" placeholder="再次輸入新密碼" required minlength="6">
+      </div>
+      <button type="submit" class="btn-login">更改密碼</button>
+    </form>
+  </div>
+</div>
+
+
+<div class="header">
+  <div class="header-inner">
+    <div style="display:flex;align-items:center">
+      <h1>28car 車源資料庫</h1>
+      <span class="subtitle">資料來源 28car.com（私人+車行）</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div id="userInfoArea" class="user-info" style="display:none">
+        <span class="user-name" id="currentUserName"></span>
+        <span class="user-role" id="currentUserRole"></span>
+        <button class="btn-admin" id="adminBtn" onclick="openAdminPanel()" style="display:none">管理後台</button>
+        <button class="btn-logout" onclick="handleLogout()">登出</button>
+      </div>
+      <span id="headerTime" style="font-size:12px;color:#888"></span>
+      <button class="btn btn-sm" onclick="showRestartModal()" title="重啟伺服器">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        重啟
+      </button>
+      <button class="theme-toggle" onclick="toggleDarkMode()" title="切換深色模式">
+        <span id="themeIcon">🌙</span>
+        <span id="themeText">深色</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat-item"><div class="stat-num" id="statTotal">-</div><div class="stat-label">總車輛</div></div>
+  <div class="stat-item"><div class="stat-num" id="statActive">-</div><div class="stat-label">在售中</div></div>
+  <div class="stat-item"><div class="stat-num" id="statSell">-</div><div class="stat-label">私人</div></div>
+  <div class="stat-item"><div class="stat-num" id="statCmy">-</div><div class="stat-label">車行</div></div>
+  <div class="stat-item"><div class="stat-num green" id="statTodayNew">-</div><div class="stat-label">本日新增</div></div>
+  <div class="stat-item"><div class="stat-num blue" id="statTodayUpdated">-</div><div class="stat-label">本日更新</div></div>
+  <div class="stat-item"><div class="stat-num" id="statPhotos">-</div><div class="stat-label">已下載圖片</div></div>
+</div>
+
+<!-- 爬蟲狀態區 -->
+<div id="scraperStatus" class="scraper-status" style="display:none"></div>
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('cars')">車輛列表</button>
+  <button class="tab-btn" onclick="switchTab('contacts')">聯絡人目錄</button>
+  <button class="tab-btn" id="tabCrmBtn" onclick="switchTab('crm')">建立活動</button>
+  <button class="tab-btn" id="tabSmsBtn" onclick="switchTab('sms')">簡訊系統</button>
+</div>
+
+<!-- ==================== Tab 1: Cars ==================== -->
+<div class="tab-content active" id="tabCars">
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="搜尋品牌、型號...">
+    <select id="filterSource"><option value="">全部來源</option></select>
+    <select id="filterCarType"><option value="">全部車類</option></select>
+    <select id="filterMake"><option value="">全部車廠</option></select>
+    <select id="filterFuel"><option value="">全部燃料</option></select>
+    <select id="filterSeats"><option value="">全部座位</option></select>
+    <select id="filterTransmission"><option value="">全部傳動</option></select>
+    <select id="filterYear"><option value="">全部年份</option></select>
+    <select id="filterPrice">
+      <option value="">全部售價</option>
+      <option value="1">$30,000 以下</option>
+      <option value="2">$30,001 - $50,000</option>
+      <option value="3">$50,001 - $100,000</option>
+      <option value="4">$100,001 - $200,000</option>
+      <option value="5">$200,001 - $400,000</option>
+      <option value="6">$400,001 - $600,000</option>
+      <option value="7">$600,001 - $800,000</option>
+      <option value="8">$800,001 - $1,000,000</option>
+      <option value="9">$1,000,001 - $2,000,000</option>
+      <option value="10">$2,000,001 以上</option>
+    </select>
+    <select id="filterToday">
+      <option value="">不限日期</option>
+      <option value="new">本日新增</option>
+      <option value="updated">本日更新</option>
+      <option value="all_today">今日全部</option>
+    </select>
+    <select id="filterContactType">
+      <option value="">全部賣家</option>
+      <option value="dealer">車行</option>
+      <option value="broker">同行</option>
+      <option value="private">私人</option>
+    </select>
+    <select id="filterPriceChanged">
+      <option value="">全部價格</option>
+      <option value="yes">有價格更新</option>
+    </select>
+    <select id="filterSort">
+      <option value="updated">網站更新</option>
+      <option value="newest">首次發現</option>
+      <option value="price_asc">價格低到高</option>
+      <option value="price_desc">價格高到低</option>
+      <option value="year_desc">年份新到舊</option>
+      <option value="views">最多瀏覽</option>
+    </select>
+    <button class="btn" onclick="loadCars(1)">搜尋</button>
+    <button class="btn btn-outline" onclick="resetFilters()">重置</button>
+  </div>
+  <div class="container">
+    <div class="car-grid" id="carGrid"></div>
+    <div class="pagination" id="carPagination"></div>
+  </div>
+</div>
+
+<!-- ==================== Tab 2: Contacts ==================== -->
+<div class="tab-content" id="tabContacts">
+  <div class="filter-bar">
+    <input type="text" id="contactSearch" placeholder="搜尋聯絡人...">
+    <select id="contactClass">
+      <option value="">全部分類</option>
+      <option value="dealer">車行 (5+輛)</option>
+      <option value="broker">同行 (2-4輛)</option>
+      <option value="private" selected>私人 (1輛)</option>
+    </select>
+    <select id="contactIntention">
+      <option value="">全部意願</option>
+      <option value="willing">有意願</option>
+      <option value="unwilling">無意願</option>
+      <option value="tracking">待追蹤</option>
+      <option value="sold">車輛已售</option>
+    </select>
+    <select id="contactHasLogs">
+      <option value="">全部紀錄</option>
+      <option value="yes">有聯絡紀錄</option>
+      <option value="no">無聯絡紀錄</option>
+    </select>
+    <select id="contactLastDays">
+      <option value="">全部時間</option>
+      <option value="7">7天內聯絡</option>
+      <option value="30">30天內聯絡</option>
+      <option value="90">90天內聯絡</option>
+      <option value="never">從未聯絡</option>
+    </select>
+    <select id="contactContactedBy">
+      <option value="">全部聯絡人</option>
+    </select>
+    <select id="contactUpdateDays">
+      <option value="">全部更新</option>
+      <option value="1">今天更新</option>
+      <option value="3">3天內更新</option>
+      <option value="7">7天內更新</option>
+      <option value="30">30天內更新</option>
+    </select>
+    <select id="contactPriceChanged">
+      <option value="">全部價格</option>
+      <option value="yes">有價格更新</option>
+    </select>
+    <select id="contactSort">
+      <option value="car_count_desc">車輛數多→少</option>
+      <option value="car_count_asc">車輛數少→多</option>
+      <option value="last_update">最近更新</option>
+      <option value="sms_count_desc">簡訊次數多→少</option>
+      <option value="last_contact">最近聯絡</option>
+      <option value="name_asc">名稱排序</option>
+    </select>
+    <button class="btn" onclick="loadContacts(1)">搜尋</button>
+    <button class="btn btn-outline" onclick="resetContactFilters()">重置</button>
+  </div>
+  <div style="background:rgba(255,255,255,0.9);padding:12px 24px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(0,0,0,0.05)">
+    <button class="btn btn-sm" onclick="exportContactsCSV()">📥 匯出 CSV</button>
+    <!-- 批量操作區 -->
+    <div id="contactBatchBar" style="display:none;margin-left:20px;padding:8px 16px;background:#e3f2fd;border-radius:6px;display:none;align-items:center;gap:12px">
+      <span style="font-size:13px">已選擇 <b id="contactSelectedCount">0</b> 筆</span>
+      <button class="btn btn-sm" onclick="openBatchClassificationModal()">修改分類</button>
+      <button class="btn btn-sm btn-outline" onclick="clearContactSelection()">取消選擇</button>
+    </div>
+    <span style="margin-left:auto">
+      <button class="btn btn-orange btn-sm" onclick="rebuildContacts()">重建分組</button>
+    </span>
+  </div>
+  <div class="container">
+    <div id="contactsTable"></div>
+    <div class="pagination" id="contactsPagination"></div>
+  </div>
+</div>
+
+<!-- ==================== Tab 3: 建立活動 ==================== -->
+<div class="tab-content" id="tabCrm">
+  <div class="container">
+    <div class="toolbar">
+      <div class="toolbar-left"><h3 style="font-size:16px">活動列表</h3></div>
+      <div class="toolbar-right"><button class="btn" onclick="openCreateCampaign()">建立活動</button></div>
+    </div>
+    <div id="campaignList"></div>
+  </div>
+</div>
+
+<!-- ==================== Tab 4: SMS ==================== -->
+<div class="tab-content" id="tabSms">
+  <div class="container" style="padding:20px">
+    <!-- SMS 統計區 -->
+    <div class="sms-stats-bar" style="display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap">
+      <div class="stat-item" style="background:#f8f9fa;padding:15px 20px;border-radius:8px;min-width:120px">
+        <div class="stat-num" id="smsTodaySent">-</div><div class="stat-label">今日已發送</div>
+      </div>
+      <div class="stat-item" style="background:#e6f4ea;padding:15px 20px;border-radius:8px;min-width:120px">
+        <div class="stat-num green" id="smsTodaySuccess">-</div><div class="stat-label">今日成功</div>
+      </div>
+      <div class="stat-item" style="background:#fff3e0;padding:15px 20px;border-radius:8px;min-width:120px">
+        <div class="stat-num" id="smsPending" style="color:#f57c00">-</div><div class="stat-label">待發送</div>
+      </div>
+      <div class="stat-item" style="background:#f3f4f6;padding:15px 20px;border-radius:8px;min-width:120px">
+        <div class="stat-num" id="smsTotalSent">-</div><div class="stat-label">累計發送</div>
+      </div>
+    </div>
+
+    <!-- 最後發送狀態 -->
+    <div id="smsLastRunStatus" class="scraper-status" style="display:none;margin-bottom:20px"></div>
+
+    <!-- 發送來源設定 - 新增 -->
+    <div class="sms-hero" style="background:linear-gradient(135deg, #C7EDCC 0%, #81C784 100%);border-radius:16px;padding:24px;margin-bottom:20px;color:#fff;box-shadow:0 10px 40px rgba(76,175,80,0.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+        <div>
+          <h3 style="font-size:18px;font-weight:700;margin-bottom:8px">簡訊發送中心</h3>
+          <p style="opacity:0.9;font-size:13px">選擇發送對象並執行簡訊發送</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn" style="background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.3)" onclick="showSendConfirm()">
+            <span style="font-size:16px">&#9889;</span> 立即發送
+          </button>
+        </div>
+      </div>
+      
+      <!-- 發送來源選項 -->
+      <div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px">
+        <label style="background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:12px;padding:16px;cursor:pointer;border:2px solid transparent;transition:all 0.2s" class="source-option" onclick="selectSmsSource('private')">
+          <input type="radio" name="smsSource" value="private" checked style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">聯絡人目錄 - 私人賣家</div>
+              <div style="font-size:12px;opacity:0.8">車輛數=1 的聯絡人</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:24px;font-weight:700" id="sourcePrivateCount">-</div>
+              <div style="font-size:11px;opacity:0.8">人</div>
+            </div>
+          </div>
+        </label>
+        
+        <label style="background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:12px;padding:16px;cursor:pointer;border:2px solid transparent;transition:all 0.2s" class="source-option" onclick="selectSmsSource('today_new')">
+          <input type="radio" name="smsSource" value="today_new" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">今日新增/更新</div>
+              <div style="font-size:12px;opacity:0.8">今日爬蟲新增或更新的</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:24px;font-weight:700" id="sourceTodayCount">-</div>
+              <div style="font-size:11px;opacity:0.8">人</div>
+            </div>
+          </div>
+        </label>
+        
+        <label style="background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:12px;padding:16px;cursor:pointer;border:2px solid transparent;transition:all 0.2s" class="source-option" onclick="selectSmsSource('crm_campaign')">
+          <input type="radio" name="smsSource" value="crm_campaign" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">活動名單</div>
+              <div style="font-size:12px;opacity:0.8">從已建立活動選擇</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:24px;font-weight:700" id="sourceCrmCount">-</div>
+              <div style="font-size:11px;opacity:0.8">人</div>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <!-- 左側：簡訊模板管理 -->
+      <div class="sms-card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+          <h3 style="font-size:16px">簡訊模板</h3>
+          <button class="btn btn-sm" onclick="showAddTemplateForm()">+ 新增模板</button>
+        </div>
+        <div id="smsTemplateForm" style="display:none;margin-bottom:15px;padding:15px;background:#f8f9fa;border-radius:8px">
+          <input type="hidden" id="editTemplateId">
+          <div style="margin-bottom:10px">
+            <label style="font-size:13px;font-weight:600">模板名稱</label>
+            <input type="text" id="templateName" placeholder="例：私人賣家推廣" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px">
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:13px;font-weight:600">簡訊內容 <span style="color:#888;font-weight:normal">(中文70字/則，英文160字/則)</span></label>
+            <textarea id="templateContent" rows="4" placeholder="輸入簡訊內容..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px;resize:vertical"></textarea>
+            <div style="font-size:12px;color:#888;margin-top:4px">字數：<span id="templateCharCount">0</span></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-green" onclick="saveTemplate()">儲存</button>
+            <button class="btn btn-sm btn-outline" onclick="hideTemplateForm()">取消</button>
+          </div>
+        </div>
+        <div id="smsTemplateList"></div>
+      </div>
+
+      <!-- 右側：API 設定 -->
+      <div class="sms-card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.06)">
+        <h3 style="font-size:16px;margin-bottom:20px;font-weight:700;color:#333">OneWaySMS 設定</h3>
+        <div id="smsConfigForm">
+          <div style="margin-bottom:12px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="smsEnabled">
+              <span style="font-weight:600">啟用自動發送</span>
+            </label>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600">API Username</label>
+            <input type="text" id="smsApiUsername" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600">API Password</label>
+            <input type="password" id="smsApiPassword" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600">Sender ID <span style="color:#888;font-weight:normal">(收件者看到的名稱)</span></label>
+            <input type="text" id="smsSenderId" placeholder="28Car" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600">每日上限</label>
+            <input type="number" id="smsDailyLimit" value="100" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-top:4px">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600">每日發送時間</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="time" id="smsSendWindowStart" value="10:00" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+              <span>至</span>
+              <input type="time" id="smsSendWindowEnd" value="11:00" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+            </div>
+            <div style="font-size:11px;color:#888;margin-top:4px">排程任務會在此時間區間內發送簡訊</div>
+          </div>
+          <div id="smsConfigButtons">
+          <button class="btn" onclick="saveSmsConfig()">儲存設定</button>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 發送記錄 -->
+    <div style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.06);margin-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+        <h3 style="font-size:16px">發送記錄</h3>
+        <div style="display:flex;gap:8px">
+          <select id="smsLogFilter" onchange="loadSmsLogs(1)" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px">
+            <option value="">全部狀態</option>
+            <option value="success">成功</option>
+            <option value="failed">失敗</option>
+          </select>
+        </div>
+      </div>
+      <div id="smsLogList"></div>
+      <div id="smsLogPagination" class="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SMS Send Confirm Modal ==================== -->
+<div class="modal-overlay" id="smsSendConfirmModal" onclick="if(event.target===this)closeModal('smsSendConfirmModal')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>確認發送簡訊</h2>
+      <button class="modal-close" onclick="closeModal('smsSendConfirmModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:linear-gradient(135deg, #C7EDCC 0%, #81C784 100%);border-radius:12px;padding:20px;color:#fff;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;opacity:0.8">發送對象</div>
+            <div style="font-size:18px;font-weight:700;margin-top:4px" id="confirmSourceName">聯絡人目錄 - 私人賣家</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:36px;font-weight:800" id="confirmCount">0</div>
+            <div style="font-size:12px;opacity:0.8">通簡訊</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:13px;color:#666;margin-bottom:8px">使用模板</div>
+        <div style="font-weight:600" id="confirmTemplateName">-</div>
+        <div style="font-size:13px;color:#888;margin-top:8px;padding:12px;background:#fff;border-radius:8px;max-height:100px;overflow-y:auto" id="confirmTemplateContent">-</div>
+      </div>
+      
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:20px">&#9888;</span>
+          <div>
+            <div style="font-weight:600;color:#856404">注意事項</div>
+            <div style="font-size:13px;color:#856404;margin-top:4px">
+              發送後無法撤回，請確認發送對象和內容正確。<br>
+              每則簡訊將從您的 OneWaySMS 帳戶扣款。
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('smsSendConfirmModal')">取消</button>
+        <button class="btn btn-green" style="flex:1" onclick="executeSendSms()">
+          <span style="font-size:16px">&#9889;</span> 確定發送
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SMS Detail Modal ==================== -->
+<div class="modal-overlay" id="smsDetailModal" onclick="if(event.target===this)closeModal('smsDetailModal')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>簡訊發送詳情</h2>
+      <button class="modal-close" onclick="closeModal('smsDetailModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="smsDetailContent"></div>
+  </div>
+</div>
+
+<!-- ==================== Car Detail Modal ==================== -->
+<div class="modal-overlay" id="carModal" onclick="if(event.target===this)closeModal('carModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="carModalTitle">車輛詳情</h2>
+      <button class="modal-close" onclick="closeModal('carModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="carModalBody"></div>
+  </div>
+</div>
+
+
+<!-- ==================== Batch Classification Modal ==================== -->
+<div class="modal-overlay" id="batchClassModal" onclick="if(event.target===this)closeModal('batchClassModal')">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>批量修改分類</h2>
+      <button class="modal-close" onclick="closeModal('batchClassModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <p style="margin-bottom:16px;font-size:14px">
+        即將修改 <b id="batchClassCount">0</b> 筆聯絡人的分類
+      </p>
+      <div style="margin-bottom:20px">
+        <label style="display:block;margin-bottom:8px;font-weight:600">新分類</label>
+        <select id="batchClassSelect" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px">
+          <option value="">請選擇分類...</option>
+          <option value="private">私人 (1輛)</option>
+          <option value="broker">同行 (2-4輛)</option>
+          <option value="dealer">車行 (5+輛)</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:#666;margin-bottom:20px;background:#f5f5f5;padding:10px;border-radius:6px">
+        ⚠️ 手動修改的分類不會被爬蟲自動覆蓋
+      </p>
+      <div style="display:flex;gap:12px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="closeModal('batchClassModal')">取消</button>
+        <button class="btn btn-green" onclick="submitBatchClassification()">確認修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Contact Detail Modal ==================== -->
+<div class="modal-overlay" id="contactModal" onclick="if(event.target===this)closeModal('contactModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="contactModalTitle">聯絡人詳情</h2>
+      <button class="modal-close" onclick="closeModal('contactModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="contactModalBody"></div>
+  </div>
+</div>
+
+<!-- ==================== CRM Edit Modal ==================== -->
+<div class="modal-overlay" id="crmEditModal" onclick="if(event.target===this)closeModal('crmEditModal')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>編輯聯絡人</h2>
+      <button class="modal-close" onclick="closeModal('crmEditModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="crmEditBody"></div>
+  </div>
+</div>
+
+<!-- ==================== Send Modal ==================== -->
+<div class="modal-overlay" id="sendModal" onclick="if(event.target===this)closeModal('sendModal')">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2 id="sendModalTitle">發送訊息</h2>
+      <button class="modal-close" onclick="closeModal('sendModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="sendModalBody"></div>
+  </div>
+</div>
+
+<!-- ==================== SMS Send Confirm Modal ==================== -->
+<div class="modal-overlay" id="smsSendConfirmModal" onclick="if(event.target===this)closeModal('smsSendConfirmModal')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header" style="background:linear-gradient(135deg, #2E7D32, #4CAF50);color:#fff">
+      <h2>確認發送簡訊</h2>
+      <button class="modal-close" onclick="closeModal('smsSendConfirmModal')" style="color:#fff">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:4px">發送對象</div>
+            <div style="font-weight:600" id="confirmSourceName">-</div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:4px">發送數量</div>
+            <div style="font-size:24px;font-weight:700;color:#4CAF50" id="confirmCount">0</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:20px">
+        <div style="font-size:12px;color:#888;margin-bottom:8px">使用模板</div>
+        <div style="font-weight:600;margin-bottom:8px" id="confirmTemplateName">-</div>
+        <div style="background:#fff3e0;border-left:4px solid #ff9800;padding:12px;border-radius:0 8px 8px 0;font-size:13px;color:#666" id="confirmTemplateContent">-</div>
+      </div>
+      
+      <div style="background:#fff3e0;border-radius:8px;padding:12px;margin-bottom:20px;font-size:13px;color:#e65100">
+        <strong>注意：</strong>發送後將無法撤回，請確認資訊正確。
+      </div>
+      
+      <div style="display:flex;gap:12px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeModal('smsSendConfirmModal')">取消</button>
+        <button class="btn" onclick="executeSendSms()">確認發送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== Campaign Create Modal ==================== -->
+<div class="modal-overlay" id="campaignModal" onclick="if(event.target===this)closeModal('campaignModal')">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2>建立活動</h2>
+      <button class="modal-close" onclick="closeModal('campaignModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>活動名稱</label>
+        <input type="text" id="campName" placeholder="輸入活動名稱">
+      </div>
+      <div class="form-group">
+        <label>類型</label>
+        <select id="campType"><option value="sms">SMS 簡訊</option><option value="email">Email 郵件</option></select>
+      </div>
+
+      <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0">
+        <h4 style="margin-bottom:12px;font-size:14px">目標篩選條件</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">分類</label>
+            <select id="campFilterClass" style="width:100%">
+              <option value="">全部</option>
+              <option value="private" selected>私人賣家</option>
+              <option value="broker">中間商</option>
+              <option value="dealer">車行</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">意願狀態</label>
+            <select id="campFilterIntention" style="width:100%">
+              <option value="">全部</option>
+              <option value="willing">有意願</option>
+              <option value="unwilling">無意願</option>
+              <option value="tracking">待追蹤</option>
+              <option value="sold">車輛已售</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">車輛數</label>
+            <select id="campFilterCarCount" style="width:100%">
+              <option value="">不限</option>
+              <option value="1" selected>= 1 輛</option>
+              <option value="2-4">2-4 輛</option>
+              <option value="5+">5+ 輛</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">聯絡紀錄</label>
+            <select id="campFilterHasLogs" style="width:100%">
+              <option value="">全部</option>
+              <option value="yes">有聯絡紀錄</option>
+              <option value="no">無聯絡紀錄</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">最後聯絡時間</label>
+            <select id="campFilterLastDays" style="width:100%">
+              <option value="">全部</option>
+              <option value="7">7天內聯絡</option>
+              <option value="30">30天內聯絡</option>
+              <option value="90">90天內聯絡</option>
+              <option value="never">從未聯絡</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">最後聯絡人</label>
+            <select id="campFilterContactedBy" style="width:100%">
+              <option value="">全部</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">更新日期</label>
+            <select id="campFilterUpdateDays" style="width:100%">
+              <option value="">全部</option>
+              <option value="1">今天更新</option>
+              <option value="3">3天內更新</option>
+              <option value="7">7天內更新</option>
+              <option value="30">30天內更新</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">價格更新</label>
+            <select id="campFilterPriceChanged" style="width:100%">
+              <option value="">全部</option>
+              <option value="yes">有價格更新</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">排除已發送</label>
+            <select id="campFilterExcludeSent" style="width:100%">
+              <option value="yes">排除今日已發送</option>
+              <option value="no">不排除</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#666">
+          <span>符合條件：<b id="campTargetCount">計算中...</b></span>
+          <button type="button" class="btn btn-sm btn-outline" style="margin-left:12px" onclick="previewCampaignTargets()">預覽名單</button>
+        </div>
+      </div>
+
+      <button class="btn" onclick="createCampaign()">建立活動</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Campaign Detail Modal ==================== -->
+<div class="modal-overlay" id="campDetailModal" onclick="if(event.target===this)closeModal('campDetailModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="campDetailTitle">活動詳情</h2>
+      <button class="modal-close" onclick="closeModal('campDetailModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="campDetailBody"></div>
+  </div>
+</div>
+
+<!-- 管理後台 Modal -->
+<div id="adminModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:900px;max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;padding-bottom:16px;border-bottom:1px solid #eee">
+      <h3 style="margin:0;display:flex;align-items:center;gap:10px">
+        <span style="font-size:24px">⚙️</span> 管理後台
+      </h3>
+      <button class="close-btn" onclick="closeModal('adminModal')">&times;</button>
+    </div>
+    <div style="display:flex;gap:16px;margin:16px 0">
+      <button class="btn btn-sm" id="adminTabUsers" onclick="switchAdminTab('users')">使用者管理</button>
+      <button class="btn btn-sm btn-outline" id="adminTabLogs" onclick="switchAdminTab('logs')">操作日誌</button>
+      <button class="btn btn-sm btn-outline" id="adminTabNetwork" onclick="switchAdminTab('network')">網路資訊</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto">
+      <!-- 使用者管理 -->
+      <div id="adminPanelUsers">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h4 style="margin:0">使用者列表</h4>
+          <button class="btn btn-sm" onclick="showAddUserForm()">+ 新增使用者</button>
+        </div>
+        <div id="addUserFormArea"></div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>帳號</th>
+              <th>顯示名稱</th>
+              <th>角色</th>
+              <th>狀態</th>
+              <th>最後登入</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+      <!-- 操作日誌 -->
+      <div id="adminPanelLogs" style="display:none">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <input type="text" id="logFilterUsername" placeholder="使用者名稱" style="width:150px">
+          <select id="logFilterAction" style="width:150px">
+            <option value="">所有操作</option>
+            <option value="LOGIN">登入</option>
+            <option value="LOGOUT">登出</option>
+            <option value="CREATE_USER">建立使用者</option>
+            <option value="UPDATE_USER">更新使用者</option>
+            <option value="DELETE_USER">刪除使用者</option>
+            <option value="CHANGE_PASSWORD">更改密碼</option>
+          </select>
+          <input type="date" id="logFilterFrom" style="width:150px">
+          <input type="date" id="logFilterTo" style="width:150px">
+          <button class="btn btn-sm" onclick="loadAdminLogs(1)">搜尋</button>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>使用者</th>
+              <th>操作</th>
+              <th>目標</th>
+              <th>詳情</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody"></tbody>
+        </table>
+        <div id="logPagination" style="margin-top:16px;text-align:center"></div>
+      </div>
+      <!-- 網路資訊 -->
+      <div id="adminPanelNetwork" style="display:none">
+        <div class="network-info-card">
+          <h4>🌐 區域網路連線資訊</h4>
+          <p style="color:#666;margin-bottom:20px">其他電腦可以透過以下網址連入本系統</p>
+          <div style="display:grid;gap:16px">
+            <div class="info-row">
+              <span class="info-label">電腦名稱</span>
+              <span class="info-value" id="networkHostname">載入中...</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">區域網路 IP</span>
+              <span class="info-value" id="networkIP">載入中...</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">連線埠</span>
+              <span class="info-value" id="networkPort">載入中...</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">連線網址</span>
+              <span class="info-value" id="networkURL" style="color:#667eea;font-weight:600">載入中...</span>
+              <button class="btn btn-sm" onclick="copyNetworkURL()" style="margin-left:10px">複製</button>
+            </div>
+          </div>
+          <div style="margin-top:24px;padding:16px;background:#fff3cd;border-radius:8px">
+            <strong>⚠️ 注意事項</strong>
+            <ul style="margin:10px 0 0 20px;color:#666">
+              <li>請確保其他電腦與本機在同一個 WiFi 網路下</li>
+              <li>如果無法連線，請檢查 Windows 防火牆設定</li>
+              <li>首次連線可能需要在防火牆允許 Python/28car_server 的網路存取</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯使用者 Modal -->
+<div id="editUserModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:450px">
+    <div class="modal-header">
+      <h3 id="editUserTitle">編輯使用者</h3>
+      <button class="close-btn" onclick="closeModal('editUserModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editUserId">
+      <div class="form-group">
+        <label>帳號</label>
+        <input type="text" id="editUsername" readonly style="background:#f5f5f5">
+      </div>
+      <div class="form-group">
+        <label>顯示名稱</label>
+        <input type="text" id="editDisplayName" placeholder="用於溝通紀錄顯示">
+      </div>
+      <div class="form-group">
+        <label>角色</label>
+        <select id="editRole">
+          <option value="user">一般使用者</option>
+          <option value="admin">管理員</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>狀態</label>
+        <select id="editIsActive">
+          <option value="1">啟用</option>
+          <option value="0">停用</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>新密碼 <span style="font-size:11px;color:#888">(留空則不更改)</span></label>
+        <input type="password" id="editPassword" placeholder="至少6個字元">
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="editMustChangePwd"> 下次登入時強制更改密碼
+        </label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button class="btn" onclick="saveEditUser()">儲存</button>
+        <button class="btn btn-outline" onclick="closeModal('editUserModal')">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const sourceLabels = { sell: '私人', cmy: '車行' };
+const statusLabels = { new: '新增', contacted: '已聯繫', replied: '已回覆', not_interested: '無意願' };
+const classLabels = { dealer: '車行', broker: '同行', private: '私人' };
+let crmSelectedIds = new Set();
+
+// ============================================================
+// Init
+// ============================================================
+async function init() {
+  await Promise.all([loadStats(), loadFilters()]);
+  loadCars(1);
+  document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadCars(1); });
+  document.getElementById('contactSearch').addEventListener('keydown', e => { if (e.key === 'Enter') loadContacts(1); });
+  // CRM 聯絡人管理已移除
+}
+
+// ============================================================
+// Tab Switching
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['cars','contacts','crm','sms'][i] === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  if (tab === 'contacts') { loadContactedByOptions(); loadContacts(1); }
+  if (tab === 'crm') { loadCampaigns(); }
+  if (tab === 'sms') { loadSmsStats(); loadSmsSourceStats(); loadSmsTemplates(); loadSmsConfig(); loadSmsLogs(1); }
+}
+
+function switchCrmSub(sub) {
+  document.querySelectorAll('.sub-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['crmContacts','crmCampaigns'][i] === sub);
+  });
+  document.querySelectorAll('.sub-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('sub' + sub.charAt(0).toUpperCase() + sub.slice(1)).classList.add('active');
+  if (sub === 'crmCampaigns') loadCampaigns();
+}
+
+// ============================================================
+// Stats
+// ============================================================
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const s = await r.json();
+    document.getElementById('statTotal').textContent = s.total.toLocaleString();
+    document.getElementById('statActive').textContent = s.active.toLocaleString();
+    document.getElementById('statPhotos').textContent = s.total_photos.toLocaleString();
+    document.getElementById('statTodayNew').textContent = (s.today_new || 0).toLocaleString();
+    document.getElementById('statTodayUpdated').textContent = (s.today_updated || 0).toLocaleString();
+    let sellCount = 0, cmyCount = 0;
+    if (s.sources) {
+      s.sources.forEach(src => {
+        if (src.name === 'sell') sellCount = src.count;
+        if (src.name === 'cmy') cmyCount = src.count;
+      });
+    }
+    document.getElementById('statSell').textContent = sellCount.toLocaleString();
+    document.getElementById('statCmy').textContent = cmyCount.toLocaleString();
+  } catch(e) { console.error('loadStats:', e); }
+  loadScraperStatus();
+}
+
+async function loadScraperStatus() {
+  try {
+    const r = await fetch('/api/scraper/runs?limit=5');
+    const data = await r.json();
+    const container = document.getElementById('scraperStatus');
+    if (!data.runs || data.runs.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+    const latest = data.runs[0];
+    const statusClass = latest.status === 'success' ? 'success' : (latest.status === 'error' ? 'error' : 'running');
+    const statusText = latest.status === 'success' ? '成功' : (latest.status === 'error' ? '失敗' : '執行中');
+    const startTime = latest.started_at ? latest.started_at.replace('T', ' ').substring(0, 19) : '-';
+    const duration = (latest.started_at && latest.finished_at)
+      ? Math.round((new Date(latest.finished_at) - new Date(latest.started_at)) / 1000) + '秒'
+      : '-';
+
+    let statsHtml = '';
+    if (latest.status === 'success') {
+      statsHtml = `<span class="scraper-stats">新增:${latest.new_cars || 0} 更新:${latest.updated_cars || 0} 詳情:${latest.details_scraped || 0} 圖片:${latest.photos_downloaded || 0}</span>`;
+    } else if (latest.status === 'error') {
+      statsHtml = `<span class="scraper-stats" style="color:#c62828">${esc(latest.error_message || '未知錯誤')}</span>`;
+    }
+
+    container.className = 'scraper-status ' + statusClass;
+    container.innerHTML = `<span class="status-label status-${statusClass}">爬蟲${statusText}</span>` +
+      `<span>最後執行: ${startTime}</span>` +
+      (duration !== '-' ? `<span style="margin-left:12px">耗時: ${duration}</span>` : '') +
+      statsHtml;
+    container.style.display = 'block';
+  } catch(e) {
+    console.error('loadScraperStatus:', e);
+    document.getElementById('scraperStatus').style.display = 'none';
+  }
+}
+
+// ============================================================
+// Filters
+// ============================================================
+async function loadFilters() {
+  try {
+    const r = await fetch('/api/filters');
+    const f = await r.json();
+    fillSelect('filterSource', (f.sources||[]).map(s => ({v:s, l:sourceLabels[s]||s})), '全部來源');
+    fillSelect('filterCarType', (f.car_types||[]).map(s => ({v:s, l:s})), '全部車類');
+    fillSelect('filterMake', (f.makes||[]).map(s => ({v:s, l:s})), '全部車廠');
+    fillSelect('filterFuel', (f.fuels||[]).map(s => ({v:s, l:s})), '全部燃料');
+    fillSelect('filterSeats', (f.seats||[]).map(s => ({v:s, l:s+'座'})), '全部座位');
+    fillSelect('filterTransmission', (f.transmissions||[]).map(s => ({v:s, l:s})), '全部傳動');
+    fillSelect('filterYear', (f.years||[]).map(s => ({v:s, l:s})), '全部年份');
+  } catch(e) { console.error('loadFilters:', e); }
+}
+
+function fillSelect(id, items, placeholder) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  items.forEach(item => {
+    const v = typeof item === 'object' ? item.v : item;
+    const l = typeof item === 'object' ? item.l : item;
+    sel.innerHTML += `<option value="${esc(v)}">${esc(l)}</option>`;
+  });
+}
+
+function resetFilters() {
+  ['searchInput','filterSource','filterCarType','filterMake','filterFuel','filterSeats','filterTransmission','filterYear','filterPrice','filterToday','filterContactType','filterPriceChanged'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el.tagName === 'INPUT') el.value = ''; else el.selectedIndex = 0;
+  });
+  document.getElementById('filterSort').value = 'newest';
+  loadCars(1);
+}
+
+// ============================================================
+// Car List
+// ============================================================
+async function loadCars(page) {
+  const grid = document.getElementById('carGrid');
+  grid.innerHTML = '<div class="loading">載入中...</div>';
+
+  const params = new URLSearchParams({
+    page,
+    per_page: 24,
+    q: document.getElementById('searchInput').value,
+    source: document.getElementById('filterSource').value,
+    car_type: document.getElementById('filterCarType').value,
+    make: document.getElementById('filterMake').value,
+    fuel: document.getElementById('filterFuel').value,
+    seats: document.getElementById('filterSeats').value,
+    transmission: document.getElementById('filterTransmission').value,
+    year: document.getElementById('filterYear').value,
+    price_range: document.getElementById('filterPrice').value,
+    sort: document.getElementById('filterSort').value,
+    today_filter: document.getElementById('filterToday').value,
+    contact_type: document.getElementById('filterContactType').value,
+    price_changed: document.getElementById('filterPriceChanged').value,
+  });
+
+  try {
+    const r = await fetch(`/api/cars?${params}`);
+    const data = await r.json();
+    if (!data.cars || data.cars.length === 0) {
+      grid.innerHTML = '<div class="empty">沒有找到符合條件的車輛</div>';
+      document.getElementById('carPagination').innerHTML = '';
+      return;
+    }
+    grid.innerHTML = data.cars.map(c => renderCard(c)).join('');
+    renderPagination('carPagination', data.page, data.total_pages, data.total, 'loadCars');
+  } catch(e) {
+    grid.innerHTML = '<div class="empty">載入失敗</div>';
+    console.error(e);
+  }
+}
+
+function renderCard(car) {
+  const photo = car.photos && car.photos.length > 0 && car.photos[0].downloaded
+    ? `<img class="card-img" src="/${car.photos[0].local_path}" alt="${esc(car.make)} ${esc(car.model)}" loading="lazy">`
+    : `<div class="card-img-placeholder">&#x1f697;</div>`;
+
+  const price = car.price || '洽詢';
+  const specs = [car.fuel, car.seats ? car.seats+'座' : '', car.engine_cc, car.transmission].filter(Boolean);
+  const srcClass = car.source === 'cmy' ? 'src-cmy' : 'src-sell';
+  const srcLabel = sourceLabels[car.source] || '私人';
+
+  // Badges
+  let badges = '';
+  if (car.today_status === 'new') badges += '<span class="badge badge-new">本日新增</span>';
+  else if (car.today_status === 'updated') badges += '<span class="badge badge-updated">本日更新</span>';
+  if (car.price_changed_at) badges += '<span class="badge badge-price-changed">價格更新</span>';
+  if (car.contact_classification === 'dealer') badges += '<span class="badge badge-dealer">車行</span>';
+  else if (car.contact_classification === 'broker') badges += '<span class="badge badge-broker">同行</span>';
+
+  return `
+    <div class="car-card" onclick="openDetail('${car.vid}')">
+      ${photo}
+      <div class="card-body">
+        <div class="card-title"><span class="card-make">${esc(car.make)}</span> ${esc(car.model)}</div>
+        ${badges ? `<div class="card-badges">${badges}</div>` : ''}
+        <div class="card-specs">
+          <span class="spec-tag ${srcClass}">${srcLabel}</span>
+          ${car.car_type ? `<span class="spec-tag">${esc(car.car_type)}</span>` : ''}
+          ${specs.map(s => `<span class="spec-tag">${esc(s)}</span>`).join('')}
+          <span class="spec-tag">${esc(car.year)}年</span>
+        </div>
+        <div class="card-price">${esc(price)}</div>
+        ${car.description ? `<div class="card-desc">${esc(car.description)}</div>` : ''}
+        <div class="card-footer">
+          <span>${esc(car.car_no)}</span>
+          <span>瀏覽 ${car.views||0} | 留言 ${car.comments||0}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// Car Detail Modal
+// ============================================================
+async function openDetail(vid) {
+  openModal('carModal');
+  document.getElementById('carModalBody').innerHTML = '<div class="loading">載入中...</div>';
+
+  try {
+    const r = await fetch(`/api/car/${vid}`);
+    const car = await r.json();
+    document.getElementById('carModalTitle').textContent = `${car.make} ${car.model}`;
+    document.getElementById('carModalBody').innerHTML = renderDetail(car);
+  } catch(e) {
+    document.getElementById('carModalBody').innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+function renderDetail(car) {
+  // Badges
+  let badgesHtml = '';
+  if (car.today_status === 'new') badgesHtml += '<span class="badge badge-new">本日新增</span> ';
+  if (car.today_status === 'updated') badgesHtml += '<span class="badge badge-updated">本日更新</span> ';
+  if (car.price_changed_at) badgesHtml += '<span class="badge badge-price-changed">價格更新</span> ';
+  if (car.contact_classification === 'dealer') badgesHtml += `<span class="badge badge-dealer">車行 (${car.contact_car_count}輛)</span> `;
+  else if (car.contact_classification === 'broker') badgesHtml += `<span class="badge badge-broker">同行 (${car.contact_car_count}輛)</span> `;
+  if (badgesHtml) badgesHtml = `<div style="margin-bottom:12px">${badgesHtml}</div>`;
+
+  // Gallery
+  let gallery = '';
+  if (car.photos && car.photos.length > 0) {
+    const mainSrc = car.photos[0].downloaded ? `/${car.photos[0].local_path}` : '';
+    if (mainSrc) {
+      gallery = `<div class="gallery">
+        <img class="gallery-main" id="galleryMain" src="${mainSrc}">
+        <div class="gallery-thumbs">
+          ${car.photos.map((p, i) => p.downloaded
+            ? `<img class="gallery-thumb ${i===0?'active':''}" src="/${p.local_path}" onclick="switchPhoto(this, '/${p.local_path}')">`
+            : ''
+          ).join('')}
+        </div>
+      </div>`;
+    }
+  }
+
+  const srcLabel = sourceLabels[car.source] || '私人';
+  const specEntries = [
+    ['編號', car.car_no], ['來源', srcLabel], ['車類', car.car_type],
+    ['品牌', `${car.make} ${car.make_en || ''}`], ['型號', car.model],
+    ['燃油', car.fuel], ['座位', car.seats], ['排氣量', car.engine_cc],
+    ['傳動', car.transmission], ['年份', car.year], ['售價', car.price],
+    car.prev_price ? ['原價', `<span style="text-decoration:line-through;color:#999">${car.prev_price}</span> <span style="color:#e65100;font-size:11px">(${car.price_changed_at ? car.price_changed_at.substring(0,10) : ''}更新)</span>`] : null,
+    ['瀏覽', car.views], ['留言', car.comments],
+    ['網站更新', formatUpdatedAt(car.updated_at)],
+    ['首次發現', car.first_seen ? car.first_seen.substring(0, 10) : null],
+  ].filter(s => s && s[1]);
+
+  const specsHtml = specEntries.map(s => {
+    const label = esc(s[0]);
+    // 原價欄位已包含 HTML，不要 escape
+    const value = s[0] === '原價' ? s[1] : esc(String(s[1]));
+    return `<div class="detail-spec"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+  }).join('');
+
+  const desc = car.description ? `<div class="detail-desc">${esc(car.description)}</div>` : '';
+
+  let contact = '';
+  if (car.contact_name || car.contact_phone) {
+    let contactBadge = '';
+    if (car.contact_classification === 'dealer') contactBadge = ' <span class="badge badge-dealer">車行</span>';
+    else if (car.contact_classification === 'broker') contactBadge = ' <span class="badge badge-broker">同行</span>';
+
+    let viewLink = '';
+    if (car.contact_group_id_info) {
+      viewLink = ` <a href="#" onclick="closeModal('carModal');openContactDetail(${car.contact_group_id_info});return false" style="font-size:12px;color:#1a73e8;margin-left:8px">查看聯絡人</a>`;
+    }
+
+    contact = `<div class="detail-contact">
+      <b>聯絡人：</b>${esc(car.contact_name || '')}${contactBadge}${viewLink}
+      ${car.contact_phone ? `&nbsp;&nbsp;<b>電話：</b>${esc(car.contact_phone)}` : ''}
+    </div>`;
+  }
+
+  const source = car.detail_url
+    ? `<div style="margin-top:14px;font-size:12px;color:#999">
+        28car 原始連結：<a href="${esc(car.detail_url)}" target="_blank" style="color:#1a73e8">${esc(car.detail_url)}</a>
+       </div>`
+    : '';
+
+  return badgesHtml + gallery + `<div class="detail-specs">${specsHtml}</div>` + desc + contact + source;
+}
+
+function switchPhoto(thumb, src) {
+  document.getElementById('galleryMain').src = src;
+  document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+  thumb.classList.add('active');
+}
+
+// ============================================================
+
+// 載入聯絡人篩選選項
+async function loadContactedByOptions() {
+  try {
+    const r = await fetch('/api/contacts/contacted-by-options');
+    const data = await r.json();
+    const select = document.getElementById('contactContactedBy');
+    select.innerHTML = '<option value="">全部聯絡人</option>';
+    for (const name of data.options) {
+      select.innerHTML += `<option value="${esc(name)}">${esc(name)}</option>`;
+    }
+  } catch(e) {
+    console.error('Failed to load contacted by options:', e);
+  }
+}
+
+// Contacts Directory (Tab 2)
+// ============================================================
+async function loadContacts(page) {
+  const container = document.getElementById('contactsTable');
+  container.innerHTML = '<div class="loading">載入中...</div>';
+
+  const params = new URLSearchParams({
+    page,
+    per_page: 50,
+    q: document.getElementById('contactSearch').value,
+    classification: document.getElementById('contactClass').value,
+    intention: document.getElementById('contactIntention').value,
+    has_logs: document.getElementById('contactHasLogs').value,
+    last_days: document.getElementById('contactLastDays').value,
+    contacted_by: document.getElementById('contactContactedBy').value,
+    update_days: document.getElementById('contactUpdateDays').value,
+    price_changed: document.getElementById('contactPriceChanged').value,
+    sort: document.getElementById('contactSort').value,
+  });
+
+  try {
+    const r = await fetch(`/api/contacts?${params}`);
+    const data = await r.json();
+
+    if (data.total === 0) {
+      container.innerHTML = '<div class="empty">沒有找到聯絡人</div>';
+      document.getElementById('contactsPagination').innerHTML = '';
+      return;
+    }
+
+    let html = `<table class="data-table">
+      <thead><tr>
+        <th style="width:40px"><input type="checkbox" id="contactSelectAll" onclick="toggleContactSelectAll(this)" title="全選/取消全選"></th>
+        <th>分類</th><th>意願</th><th>姓名</th><th>電話</th>
+        <th>車輛</th><th>更新日期</th><th>簡訊</th><th>聯絡</th><th>最後聯絡人</th><th>最後聯絡</th>
+      </tr></thead><tbody>`;
+
+    const intentionLabels = { willing: '有意願', unwilling: '無意願', tracking: '待追蹤', sold: '已售' };
+    const intentionColors = { willing: '#4CAF50', unwilling: '#f44336', tracking: '#ff9800', sold: '#9e9e9e' };
+
+    for (const c of data.contacts) {
+      const cls = c.classification;
+      const badgeClass = cls === 'dealer' ? 'badge-dealer' : cls === 'broker' ? 'badge-broker' : 'badge-private';
+      const label = classLabels[cls] || cls;
+
+      const logCount = c.log_count || 0;
+      const smsCount = c.sms_count || 0;
+      // 標準格式: YYYY-MM-DD HH:MM (如 2026-02-10 02:08)
+      let lastUpdate = '-';
+      if (c.last_car_update && c.last_car_update.length >= 10) {
+        const u = c.last_car_update;
+        // 格式: MM/DD HH:MM
+        lastUpdate = u.substring(5,7) + '/' + u.substring(8,10) + ' ' + u.substring(11,16);
+      }
+      const lastSms = c.last_sms_sent ? c.last_sms_sent.substring(0, 10) : '';
+      const intentionStatus = c.intention_status || '';
+      const intentionLabel = intentionLabels[intentionStatus] || '';
+      const intentionColor = intentionColors[intentionStatus] || '#ccc';
+
+      html += `<tr class="clickable" data-group-id="${c.group_id}">
+        <td onclick="event.stopPropagation()"><input type="checkbox" class="contact-checkbox" value="${c.group_id}" onchange="updateContactSelection()"></td>
+        <td onclick="openContactDetail(${c.group_id})"><span class="badge ${badgeClass}">${label}</span></td>
+        <td onclick="openContactDetail(${c.group_id})">${intentionLabel ? `<span style="color:${intentionColor};font-weight:600;font-size:12px">${intentionLabel}</span>` : '<span style="color:#ccc">-</span>'}</td>
+        <td onclick="openContactDetail(${c.group_id})"><b>${esc(c.canonical_name)}</b></td>
+        <td onclick="openContactDetail(${c.group_id})">${esc(c.canonical_phone)}</td>
+        <td onclick="openContactDetail(${c.group_id})">${c.car_count}/${c.active_car_count}</td>
+        <td onclick="openContactDetail(${c.group_id})" style="font-size:12px;color:#888">${lastUpdate}</td>
+        <td onclick="openContactDetail(${c.group_id})">${smsCount > 0 ? `<span style="color:#4CAF50;font-weight:600">${smsCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
+        <td onclick="openContactDetail(${c.group_id})">${logCount > 0 ? `<span style="color:#1a73e8;font-weight:600">${logCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
+        <td onclick="openContactDetail(${c.group_id})" style="font-size:12px">${c.last_contacted_by ? esc(c.last_contacted_by) : '<span style="color:#ccc">-</span>'}</td>
+        <td onclick="openContactDetail(${c.group_id})" style="font-size:12px;color:#888">${c.last_contacted_at ? c.last_contacted_at.substring(0,10) : '-'}</td>
+      </tr>`;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    renderPagination('contactsPagination', data.page, data.total_pages, data.total, 'loadContacts');
+  } catch(e) {
+    container.innerHTML = '<div class="empty">載入失敗</div>';
+    console.error(e);
+  }
+}
+
+
+// ============================================================
+// 聯絡人批量選擇功能
+// ============================================================
+let selectedContactIds = new Set();
+
+function updateContactSelection() {
+  selectedContactIds.clear();
+  document.querySelectorAll('.contact-checkbox:checked').forEach(cb => {
+    selectedContactIds.add(parseInt(cb.value));
+  });
+  updateBatchBar();
+}
+
+function updateBatchBar() {
+  const count = selectedContactIds.size;
+  const bar = document.getElementById('contactBatchBar');
+  const countEl = document.getElementById('contactSelectedCount');
+
+  if (count > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = count;
+  } else {
+    bar.style.display = 'none';
+  }
+
+  // 更新全選框狀態
+  const allCheckboxes = document.querySelectorAll('.contact-checkbox');
+  const selectAll = document.getElementById('contactSelectAll');
+  if (selectAll && allCheckboxes.length > 0) {
+    const checkedCount = document.querySelectorAll('.contact-checkbox:checked').length;
+    selectAll.checked = checkedCount === allCheckboxes.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+  }
+}
+
+function toggleContactSelectAll(checkbox) {
+  document.querySelectorAll('.contact-checkbox').forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+  updateContactSelection();
+}
+
+function clearContactSelection() {
+  selectedContactIds.clear();
+  document.querySelectorAll('.contact-checkbox').forEach(cb => {
+    cb.checked = false;
+  });
+  const selectAll = document.getElementById('contactSelectAll');
+  if (selectAll) selectAll.checked = false;
+  updateBatchBar();
+}
+
+function openBatchClassificationModal() {
+  if (selectedContactIds.size === 0) {
+    alert('請先選擇聯絡人');
+    return;
+  }
+  document.getElementById('batchClassCount').textContent = selectedContactIds.size;
+  document.getElementById('batchClassSelect').value = '';
+  openModal('batchClassModal');
+}
+
+async function submitBatchClassification() {
+  const classification = document.getElementById('batchClassSelect').value;
+  if (!classification) {
+    alert('請選擇要修改的分類');
+    return;
+  }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '處理中...';
+
+  try {
+    const r = await fetch('/api/contacts/batch-classification', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        group_ids: Array.from(selectedContactIds),
+        classification: classification
+      })
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      alert(`成功修改 ${data.updated} 筆聯絡人分類`);
+      closeModal('batchClassModal');
+      clearContactSelection();
+      loadContacts(1);
+    } else {
+      alert('修改失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) {
+    alert('網路錯誤: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '確認修改';
+  }
+}
+
+function resetContactFilters() {
+  document.getElementById('contactSearch').value = '';
+  document.getElementById('contactClass').value = 'private';
+  document.getElementById('contactIntention').value = '';
+  document.getElementById('contactHasLogs').value = '';
+  document.getElementById('contactLastDays').value = '';
+  document.getElementById('contactContactedBy').value = '';
+  document.getElementById('contactUpdateDays').value = '';
+  document.getElementById('contactPriceChanged').value = '';
+  document.getElementById('contactSort').value = 'car_count_desc';
+  loadContacts(1);
+}
+
+async function exportContactsCSV() {
+  const classification = document.getElementById('contactClass').value;
+  const intention = document.getElementById('contactIntention').value;
+  const params = new URLSearchParams();
+  if (classification) params.append('classification', classification);
+  if (intention) params.append('intention', intention);
+
+  window.location.href = '/api/contacts/export?' + params.toString();
+}
+
+async function updateContactIntention(groupId, status) {
+  try {
+    await fetch(`/api/contact/${groupId}/intention`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intention_status: status })
+    });
+    openContactDetail(groupId); // Refresh detail view
+  } catch(e) {
+    alert('更新失敗: ' + e.message);
+  }
+}
+
+const methodLabels = { phone: '電話', sms: 'SMS', email: 'Email', whatsapp: 'WhatsApp', visit: '面訪', other: '其他' };
+const methodOptions = ['phone','sms','email','whatsapp','visit','other'];
+let currentContactGroupId = null;
+
+async function openContactDetail(groupId) {
+  currentContactGroupId = groupId;
+  openModal('contactModal');
+  document.getElementById('contactModalBody').innerHTML = '<div class="loading">載入中...</div>';
+
+  try {
+    const r = await fetch(`/api/contact/${groupId}`);
+    const data = await r.json();
+    document.getElementById('contactModalTitle').textContent = data.canonical_name || '聯絡人詳情';
+
+    const cls = data.classification;
+    const badgeClass = cls === 'dealer' ? 'badge-dealer' : cls === 'broker' ? 'badge-broker' : 'badge-private';
+    const label = classLabels[cls] || cls;
+
+    let names = '', phones = '';
+    try { names = JSON.parse(data.all_names || '[]').join(', '); } catch(e) { names = data.all_names || ''; }
+    try { phones = JSON.parse(data.all_phones || '[]').join(', '); } catch(e) { phones = data.all_phones || ''; }
+
+    const intentionStatus = data.intention_status || '';
+    const intentionOptions = [
+      { value: '', label: '未設定' },
+      { value: 'willing', label: '有意願' },
+      { value: 'unwilling', label: '無意願' },
+      { value: 'tracking', label: '待追蹤' },
+      { value: 'sold', label: '車輛已售' }
+    ];
+
+    let html = `<div style="margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <span class="badge ${badgeClass}">${label}</span>
+      <span><b>車輛數：</b>${data.car_count} (在售: ${data.active_car_count})</span>
+    </div>
+    <div style="margin-bottom:8px"><b>主要名稱：</b>${esc(data.canonical_name)}</div>
+    <div style="margin-bottom:8px"><b>主要電話：</b>${esc(data.canonical_phone)}</div>
+    ${data.email ? `<div style="margin-bottom:8px"><b>Email：</b><a href="mailto:${esc(data.email)}">${esc(data.email)}</a></div>` : ''}
+    ${names ? `<div style="margin-bottom:8px;font-size:13px"><b>所有名稱：</b>${esc(names)}</div>` : ''}
+    ${phones ? `<div style="margin-bottom:16px;font-size:13px"><b>所有電話：</b>${esc(phones)}</div>` : ''}`;
+
+    // ---- 溝通紀錄區 ----
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:8px">
+      <h3 style="font-size:15px">溝通紀錄 (${(data.logs||[]).length})</h3>
+      <button class="btn btn-sm btn-green" onclick="showAddLogForm(${groupId})">+ 新增紀錄</button>
+    </div>`;
+    html += `<div id="addLogFormArea"></div>`;
+    html += `<div id="logsList">`;
+
+    if (data.logs && data.logs.length > 0) {
+      html += data.logs.map(log => renderLogEntry(log, intentionStatus)).join('');
+    } else {
+      html += '<div style="color:#aaa;font-size:13px;padding:8px 0">尚無溝通紀錄</div>';
+    }
+    html += `</div>`;
+
+    // ---- 車輛列表 ----
+    if (data.cars && data.cars.length > 0) {
+      html += `<h3 style="font-size:15px;margin-bottom:8px;margin-top:24px">名下車輛 (${data.cars.length})</h3>
+        <table class="data-table">
+        <thead><tr><th>編號</th><th>品牌</th><th>型號</th><th>年份</th><th>售價</th><th>來源</th><th>更新日期</th></tr></thead><tbody>`;
+      for (const car of data.cars) {
+        html += `<tr class="clickable" onclick="closeModal('contactModal');openDetail('${car.vid}')">
+          <td>${esc(car.car_no)}</td>
+          <td>${esc(car.make)}</td><td>${esc(car.model)}</td>
+          <td>${esc(car.year)}</td><td>${esc(car.price)}</td>
+          <td>${sourceLabels[car.source]||car.source}</td>
+          <td style="font-size:12px">${car.updated_at && car.updated_at.length >= 10 ?
+            car.updated_at.substring(5,7) + '/' + car.updated_at.substring(8,10) + ' ' + car.updated_at.substring(11,16) : '-'}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+    }
+
+    document.getElementById('contactModalBody').innerHTML = html;
+  } catch(e) {
+    document.getElementById('contactModalBody').innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+function renderLogEntry(log, intentionStatus) {
+  const method = log.contact_method || 'other';
+  const mClass = 'm-' + method;
+  const mLabel = methodLabels[method] || method;
+  const contactedAt = log.contacted_at ? log.contacted_at.replace('T', ' ').substring(0, 16) : '';
+  
+  const intentionLabels = { willing: '有意願', unwilling: '無意願', tracking: '待追蹤', sold: '車輛已售' };
+  const intentionColors = { willing: '#4CAF50', unwilling: '#f44336', tracking: '#ff9800', sold: '#9e9e9e' };
+  const iLabel = intentionLabels[intentionStatus] || '';
+  const iColor = intentionColors[intentionStatus] || '#ccc';
+  
+  return `<div class="log-entry" id="logEntry_${log.id}">
+    <div class="log-actions">
+      <button onclick="showEditLogForm(${log.id}, ${log.group_id})">編輯</button>
+      <button class="del" onclick="deleteLog(${log.id}, ${log.group_id})">刪除</button>
+    </div>
+    <div class="log-meta">
+      <span><b>${esc(contactedAt)}</b></span>
+      <span class="method-tag ${mClass}">${mLabel}</span>
+      ${iLabel ? `<span style="color:${iColor};font-weight:600">${iLabel}</span>` : ''}
+      ${log.contacted_by ? `<span>聯絡人：<b>${esc(log.contacted_by)}</b></span>` : ''}
+    </div>
+    ${log.content ? `<div class="log-content">${esc(log.content)}</div>` : ''}
+  </div>`;
+}
+
+function renderLogForm(opts) {
+  const { id, groupId, contacted_by, contact_method, content, contacted_at, intention_status, isEdit } = opts;
+  const now = new Date();
+  const defaultAt = contacted_at || now.toISOString().substring(0, 16);
+  const methodOpts = methodOptions.map(m =>
+    `<option value="${m}" ${contact_method === m ? 'selected' : ''}>${methodLabels[m]}</option>`
+  ).join('');
+
+  const intentionOpts = [
+    { value: '', label: '-- 未設定 --' },
+    { value: 'willing', label: '有意願' },
+    { value: 'unwilling', label: '無意願' },
+    { value: 'tracking', label: '待追蹤' },
+    { value: 'sold', label: '車輛已售' }
+  ].map(o => `<option value="${o.value}" ${intention_status === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+  return `<div class="log-form" style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="form-group" style="margin:0">
+        <label>聯絡時間</label>
+        <input type="datetime-local" id="logAt_${id}" value="${esc(defaultAt)}">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>溝通方式</label>
+        <select id="logMethod_${id}">${methodOpts}</select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>意願狀態</label>
+        <select id="logIntention_${id}">${intentionOpts}</select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>誰聯絡的 <span style="font-size:11px;color:#888">(自動帶入登入帳號)</span></label>
+      <input type="text" id="logBy_${id}" value="${esc(contacted_by || '')}" readonly style="background:#f5f5f5;cursor:not-allowed">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>溝通內容</label>
+      <textarea id="logContent_${id}" style="height:70px" placeholder="記錄溝通內容...">${esc(content || '')}</textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" onclick="${isEdit ? `saveEditLog(${id}, ${groupId})` : `saveNewLog(${groupId})`}">${isEdit ? '更新' : '儲存'}</button>
+      <button class="btn btn-sm btn-outline" onclick="${isEdit ? `cancelEditLog(${id}, ${groupId})` : `cancelAddLog()`}">取消</button>
+    </div>
+  </div>`;
+}
+
+function showAddLogForm(groupId) {
+  const area = document.getElementById('addLogFormArea');
+  if (area.innerHTML) { area.innerHTML = ''; return; }
+  area.innerHTML = renderLogForm({ id: 'new', groupId, contacted_by: (currentUser ? (currentUser.display_name || currentUser.username) : ''), contact_method: 'phone', content: '', contacted_at: '', intention_status: '', isEdit: false });
+}
+
+function cancelAddLog() {
+  document.getElementById('addLogFormArea').innerHTML = '';
+}
+
+async function saveNewLog(groupId) {
+  const data = {
+    // contacted_by 由後端自動帶入登入帳號
+    contact_method: document.getElementById('logMethod_new').value,
+    content: document.getElementById('logContent_new').value,
+    contacted_at: document.getElementById('logAt_new').value,
+    intention_status: document.getElementById('logIntention_new').value,
+  };
+  try {
+    await fetch(`/api/contact/${groupId}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    openContactDetail(groupId);
+  } catch(e) { alert('新增失敗: ' + e.message); }
+}
+
+async function showEditLogForm(logId, groupId) {
+  const entry = document.getElementById(`logEntry_${logId}`);
+  if (!entry) return;
+
+  try {
+    const r = await fetch(`/api/contact/${groupId}`);
+    const detail = await r.json();
+    const log = (detail.logs || []).find(l => l.id === logId);
+    if (!log) return;
+
+    const at = log.contacted_at ? log.contacted_at.substring(0, 16) : '';
+    // 獲取當前聯絡人的意願狀態
+    const currentIntention = detail.intention_status || '';
+    entry.outerHTML = renderLogForm({
+      id: logId, groupId,
+      contacted_by: log.contacted_by || '',
+      contact_method: log.contact_method || 'phone',
+      content: log.content || '',
+      contacted_at: at,
+      intention_status: currentIntention,
+      isEdit: true,
+    });
+  } catch(e) { alert('載入失敗'); }
+}
+
+async function saveEditLog(logId, groupId) {
+  const data = {
+    // contacted_by 不可修改
+    contact_method: document.getElementById(`logMethod_${logId}`).value,
+    content: document.getElementById(`logContent_${logId}`).value,
+    contacted_at: document.getElementById(`logAt_${logId}`).value,
+    intention_status: document.getElementById(`logIntention_${logId}`).value,
+    group_id: groupId,
+  };
+  try {
+    await fetch(`/api/contact/log/${logId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    openContactDetail(groupId);
+  } catch(e) { alert('更新失敗: ' + e.message); }
+}
+
+async function cancelEditLog(logId, groupId) {
+  openContactDetail(groupId);
+}
+
+async function deleteLog(logId, groupId) {
+  if (!confirm('確定要刪除這筆溝通紀錄？')) return;
+  try {
+    await fetch(`/api/contact/log/${logId}`, { method: 'DELETE' });
+    openContactDetail(groupId);
+  } catch(e) { alert('刪除失敗: ' + e.message); }
+}
+
+async function rebuildContacts() {
+  if (!confirm('確定要重建聯絡人分組？這可能需要幾秒鐘。')) return;
+  try {
+    const r = await fetch('/api/contacts/rebuild', { method: 'POST' });
+    const data = await r.json();
+    alert(data.message || '重建完成');
+    loadContacts(1);
+    loadStats();
+  } catch(e) {
+    alert('重建失敗: ' + e.message);
+  }
+}
+
+// ============================================================
+// CRM Contacts (Tab 3)
+// ============================================================
+async function loadCrmConfig() {
+  try {
+    const r = await fetch('/api/crm/config');
+    const cfg = await r.json();
+    let msgs = [];
+    if (!cfg.sms_configured) msgs.push('SMS (Twilio) 尚未設定');
+    if (!cfg.email_configured) msgs.push('Email (SMTP) 尚未設定');
+    const banner = document.getElementById('crmConfigBanner');
+    if (msgs.length > 0) {
+      banner.innerHTML = `<div class="warn-banner">${msgs.join(' / ')} - 請設定環境變數後重啟</div>`;
+    } else {
+      banner.innerHTML = '<div class="info-banner">SMS 和 Email 均已設定就緒</div>';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function loadCrmContacts(page) {
+  const container = document.getElementById('crmContactsTable');
+  container.innerHTML = '<div class="loading">載入中...</div>';
+  crmSelectedIds.clear();
+  updateBulkBar();
+
+  const params = new URLSearchParams({
+    page,
+    per_page: 50,
+    q: document.getElementById('crmSearch').value,
+    status: document.getElementById('crmStatus').value,
+    has_email: document.getElementById('crmHasEmail').value,
+  });
+
+  try {
+    const r = await fetch(`/api/crm/contacts?${params}`);
+    const data = await r.json();
+
+    if (data.total === 0) {
+      container.innerHTML = '<div class="empty">尚無 CRM 聯絡人，請先點擊「匯入私人賣家」</div>';
+      document.getElementById('crmPagination').innerHTML = '';
+      return;
+    }
+
+    let html = `<table class="data-table">
+      <thead><tr>
+        <th><input type="checkbox" onchange="toggleAllCrm(this)"></th>
+        <th>姓名</th><th>電話</th><th>Email</th>
+        <th>狀態</th><th>車輛數</th><th>發送次數</th><th>操作</th>
+      </tr></thead><tbody>`;
+
+    for (const c of data.contacts) {
+      const st = c.status || 'new';
+      html += `<tr>
+        <td><input type="checkbox" value="${c.id}" onchange="toggleCrmSelect(${c.id}, this.checked)"></td>
+        <td><b>${esc(c.contact_name)}</b></td>
+        <td>${esc(c.contact_phone)}</td>
+        <td>${c.email ? esc(c.email) : '<span style="color:#ccc">-</span>'}</td>
+        <td><span class="status-dot st-${st}"></span>${statusLabels[st] || st}</td>
+        <td>${c.car_count || 0}</td>
+        <td>${c.send_count || 0}</td>
+        <td><button class="btn btn-sm btn-outline" onclick="openCrmEdit(${c.id})">編輯</button></td>
+      </tr>`;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    renderPagination('crmPagination', data.page, data.total_pages, data.total, 'loadCrmContacts');
+  } catch(e) {
+    container.innerHTML = '<div class="empty">載入失敗</div>';
+    console.error(e);
+  }
+}
+
+function toggleCrmSelect(id, checked) {
+  if (checked) crmSelectedIds.add(id); else crmSelectedIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleAllCrm(masterCheckbox) {
+  const checkboxes = document.querySelectorAll('#crmContactsTable input[type=checkbox][value]');
+  checkboxes.forEach(cb => {
+    cb.checked = masterCheckbox.checked;
+    const id = parseInt(cb.value);
+    if (masterCheckbox.checked) crmSelectedIds.add(id); else crmSelectedIds.delete(id);
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('crmBulkBar');
+  document.getElementById('crmBulkCount').textContent = crmSelectedIds.size;
+  bar.classList.toggle('active', crmSelectedIds.size > 0);
+}
+
+async function importPrivateSellers() {
+  if (!confirm('確定要匯入所有私人賣家（有電話號碼的）到 CRM？')) return;
+  try {
+    const r = await fetch('/api/crm/contacts/import', { method: 'POST' });
+    const data = await r.json();
+    alert(`匯入完成: ${data.imported} 位新聯絡人`);
+    loadCrmContacts(1);
+  } catch(e) { alert('匯入失敗: ' + e.message); }
+}
+
+// ============================================================
+// CRM Edit Contact
+// ============================================================
+async function openCrmEdit(contactId) {
+  openModal('crmEditModal');
+  document.getElementById('crmEditBody').innerHTML = '<div class="loading">載入中...</div>';
+
+  try {
+    const r = await fetch(`/api/crm/contact/${contactId}`);
+    const c = await r.json();
+
+    document.getElementById('crmEditBody').innerHTML = `
+      <div style="margin-bottom:16px">
+        <b>${esc(c.contact_name)}</b> &nbsp; ${esc(c.contact_phone)}
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="editEmail" value="${esc(c.email || '')}" placeholder="輸入 Email">
+      </div>
+      <div class="form-group">
+        <label>狀態</label>
+        <select id="editStatus">
+          <option value="new" ${c.status==='new'?'selected':''}>新增</option>
+          <option value="contacted" ${c.status==='contacted'?'selected':''}>已聯繫</option>
+          <option value="replied" ${c.status==='replied'?'selected':''}>已回覆</option>
+          <option value="not_interested" ${c.status==='not_interested'?'selected':''}>無意願</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>標籤</label>
+        <input type="text" id="editTags" value="${esc(c.tags || '')}" placeholder="用逗號分隔">
+      </div>
+      <div class="form-group">
+        <label>備註</label>
+        <textarea id="editNotes">${esc(c.notes || '')}</textarea>
+      </div>
+      <button class="btn" onclick="saveCrmContact(${contactId})">儲存</button>
+
+      ${c.messages && c.messages.length > 0 ? `
+        <h3 style="margin-top:20px;font-size:14px;margin-bottom:8px">發送紀錄</h3>
+        <table class="data-table">
+          <thead><tr><th>類型</th><th>收件人</th><th>狀態</th><th>時間</th></tr></thead>
+          <tbody>
+            ${c.messages.map(m => `<tr>
+              <td>${m.type === 'sms' ? 'SMS' : 'Email'}</td>
+              <td>${esc(m.recipient)}</td>
+              <td>${m.status === 'sent' ? '<span style="color:#1b7f37">已發送</span>' : '<span style="color:#c62828">失敗</span>'}</td>
+              <td style="font-size:12px">${esc(m.sent_at || m.created_at)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>` : ''}
+    `;
+  } catch(e) {
+    document.getElementById('crmEditBody').innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+async function saveCrmContact(contactId) {
+  const data = {
+    email: document.getElementById('editEmail').value,
+    status: document.getElementById('editStatus').value,
+    tags: document.getElementById('editTags').value,
+    notes: document.getElementById('editNotes').value,
+  };
+  try {
+    await fetch(`/api/crm/contact/${contactId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    closeModal('crmEditModal');
+    loadCrmContacts(1);
+  } catch(e) { alert('儲存失敗: ' + e.message); }
+}
+
+// ============================================================
+// CRM Send
+// ============================================================
+function openSendModal(type) {
+  if (crmSelectedIds.size === 0) { alert('請先選取聯絡人'); return; }
+  openModal('sendModal');
+  const typeLabel = type === 'sms' ? 'SMS 簡訊' : 'Email 郵件';
+  document.getElementById('sendModalTitle').textContent = `發送${typeLabel}`;
+
+  document.getElementById('sendModalBody').innerHTML = `
+    <div class="info-banner">將發送給 ${crmSelectedIds.size} 位聯絡人</div>
+    <div class="form-group">
+      <label>選擇現有活動（或直接輸入模板）</label>
+      <select id="sendCampaignSelect" onchange="onCampaignSelectChange()">
+        <option value="">-- 新建活動 --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>活動名稱</label>
+      <input type="text" id="sendCampName" value="批量${typeLabel} ${new Date().toLocaleDateString('zh-TW')}">
+    </div>
+    <div class="form-group">
+      <label>訊息模板</label>
+      <textarea id="sendTemplate" placeholder="支援佔位符: {{name}} {{phone}} {{car_count}} {{email}}"></textarea>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:#999;margin-bottom:16px">
+      佔位符: <code>{{name}}</code> 姓名, <code>{{phone}}</code> 電話, <code>{{car_count}}</code> 車輛數, <code>{{email}}</code> Email
+    </div>
+    <button class="btn" onclick="executeSend('${type}')">確認發送</button>
+  `;
+
+  loadCampaignOptions(type);
+}
+
+async function loadCampaignOptions(type) {
+  try {
+    const r = await fetch('/api/crm/campaigns');
+    const data = await r.json();
+    const sel = document.getElementById('sendCampaignSelect');
+    for (const c of data.campaigns) {
+      if (c.type === type) {
+        sel.innerHTML += `<option value="${c.id}" data-template="${esc(c.template || '')}">${esc(c.name)}</option>`;
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+function onCampaignSelectChange() {
+  const sel = document.getElementById('sendCampaignSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.template) {
+    document.getElementById('sendTemplate').value = opt.dataset.template;
+  }
+}
+
+async function executeSend(type) {
+  const campSelect = document.getElementById('sendCampaignSelect');
+  const template = document.getElementById('sendTemplate').value;
+  if (!template.trim()) { alert('請輸入訊息模板'); return; }
+  if (!confirm(`確定要發送 ${type.toUpperCase()} 給 ${crmSelectedIds.size} 位聯絡人？`)) return;
+
+  let campaignId = campSelect.value;
+
+  // Create campaign if needed
+  if (!campaignId) {
+    try {
+      const r = await fetch('/api/crm/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('sendCampName').value || '批量發送',
+          type: type,
+          template: template,
+        }),
+      });
+      const data = await r.json();
+      campaignId = data.campaign_id;
+    } catch(e) { alert('建立活動失敗'); return; }
+  }
+
+  // Send
+  try {
+    const r = await fetch(`/api/crm/campaign/${campaignId}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_ids: [...crmSelectedIds] }),
+    });
+    const result = await r.json();
+    closeModal('sendModal');
+    crmSelectedIds.clear();
+    updateBulkBar();
+    alert(`發送完成: 成功 ${result.sent}, 失敗 ${result.failed}`);
+    loadCrmContacts(1);
+  } catch(e) { alert('發送失敗: ' + e.message); }
+}
+
+// ============================================================
+// CRM Campaigns
+// ============================================================
+async function loadCampaigns() {
+  const container = document.getElementById('campaignList');
+  container.innerHTML = '<div class="loading">載入中...</div>';
+
+  try {
+    const r = await fetch('/api/crm/campaigns');
+    const data = await r.json();
+
+    if (!data.campaigns || data.campaigns.length === 0) {
+      container.innerHTML = '<div class="empty">尚無活動，點擊「建立活動」開始</div>';
+      return;
+    }
+
+    let html = '<table class="data-table"><thead><tr><th>活動名稱</th><th>類型</th><th>狀態</th><th>目標數</th><th>已發送</th><th>建立時間</th><th>操作</th></tr></thead><tbody>';
+
+    const statusLabels = { draft: '草稿', completed: '已完成' };
+    const statusColors = { draft: '#9e9e9e', completed: '#4caf50' };
+
+    for (const c of data.campaigns) {
+      const statusLabel = statusLabels[c.status] || c.status;
+      const statusColor = statusColors[c.status] || '#666';
+      html += '<tr>';
+      html += '<td><b>' + esc(c.name) + '</b></td>';
+      html += '<td>' + (c.type === 'sms' ? 'SMS' : 'Email') + '</td>';
+      html += '<td><span style="color:' + statusColor + ';font-weight:600">' + statusLabel + '</span></td>';
+      html += '<td>' + (c.total_targets || 0) + '</td>';
+      html += '<td>' + (c.sent_count || 0) + '</td>';
+      html += '<td style="font-size:12px">' + (c.created_at || '').substring(0, 10) + '</td>';
+      html += '<td style="white-space:nowrap">';
+      html += '<button class="btn btn-sm" onclick="openCampaignDetail(' + c.id + ')">查看</button> ';
+      html += '<button class="btn btn-sm btn-outline" onclick="editCampaign(' + c.id + ')">編輯</button> ';
+      html += '<button class="btn btn-sm btn-secondary" onclick="deleteCampaign(' + c.id + ')">刪除</button>';
+      html += '</td>';
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div class="empty">載入失敗</div>';
+    console.error(e);
+  }
+}
+
+function openCreateCampaign() {
+  openModal('campaignModal');
+  document.getElementById('campName').value = '';
+  
+  document.getElementById('campFilterClass').value = 'private';
+  document.getElementById('campFilterIntention').value = '';
+  document.getElementById('campFilterCarCount').value = '1';
+  document.getElementById('campFilterHasLogs').value = '';
+  document.getElementById('campFilterLastDays').value = '';
+  document.getElementById('campFilterContactedBy').value = '';
+  document.getElementById('campFilterUpdateDays').value = '';
+  document.getElementById('campFilterPriceChanged').value = '';
+  document.getElementById('campFilterExcludeSent').value = 'yes';
+  loadCampContactedByOptions();
+  updateCampaignTargetCount();
+}
+
+async function createCampaign() {
+  const name = document.getElementById('campName').value;
+  const type = document.getElementById('campType').value;
+  if (!name) { alert('請輸入活動名稱'); return; }
+
+  const target_filter = {
+    classification: document.getElementById('campFilterClass').value,
+    intention: document.getElementById('campFilterIntention').value,
+    car_count: document.getElementById('campFilterCarCount').value,
+    has_logs: document.getElementById('campFilterHasLogs').value,
+    last_days: document.getElementById('campFilterLastDays').value,
+    contacted_by: document.getElementById('campFilterContactedBy').value,
+    update_days: document.getElementById('campFilterUpdateDays').value,
+    price_changed: document.getElementById('campFilterPriceChanged').value,
+    exclude_sent: document.getElementById('campFilterExcludeSent').value
+  };
+
+  try {
+    await fetch('/api/crm/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type, target_filter }),
+    });
+    closeModal('campaignModal');
+    loadCampaigns();
+  } catch(e) { alert('建立失敗: ' + e.message); }
+}
+
+async function openCampaignDetail(campaignId) {
+  openModal('campDetailModal');
+  document.getElementById('campDetailBody').innerHTML = '<div class="loading">載入中...</div>';
+
+  try {
+    const [campR, msgsR] = await Promise.all([
+      fetch(`/api/crm/campaign/${campaignId}`),
+      fetch(`/api/crm/campaign/${campaignId}/messages?per_page=100`),
+    ]);
+    const camp = await campR.json();
+    const msgs = await msgsR.json();
+
+    document.getElementById('campDetailTitle').textContent = camp.name;
+
+    let html = `<div style="margin-bottom:16px">
+      <b>類型：</b>${camp.type === 'sms' ? 'SMS' : 'Email'} &nbsp;
+      <b>狀態：</b>${esc(camp.status)} &nbsp;
+      <b>建立時間：</b>${esc(camp.created_at || '')}
+    </div>
+    <div class="campaign-stats-row" style="margin-bottom:16px">
+      <div class="campaign-stat"><div class="num">${camp.total_targets||0}</div><div class="lbl">目標</div></div>
+      <div class="campaign-stat"><div class="num" style="color:#1b7f37">${camp.sent_count||0}</div><div class="lbl">已發送</div></div>
+      <div class="campaign-stat"><div class="num" style="color:#c62828">${camp.failed_count||0}</div><div class="lbl">失敗</div></div>
+    </div>`;
+
+    if (camp.template) {
+      html += `<div style="margin-bottom:16px"><b>模板：</b><div style="background:#f8f9fa;padding:10px;border-radius:6px;margin-top:4px;font-size:13px;white-space:pre-wrap">${esc(camp.template)}</div></div>`;
+    }
+
+    if (msgs.messages && msgs.messages.length > 0) {
+      html += `<h3 style="font-size:14px;margin-bottom:8px">訊息紀錄 (${msgs.total})</h3>
+        <table class="data-table">
+        <thead><tr><th>聯絡人</th><th>收件人</th><th>狀態</th><th>錯誤</th><th>時間</th></tr></thead><tbody>`;
+      for (const m of msgs.messages) {
+        const statusColor = m.status === 'sent' ? '#1b7f37' : m.status === 'failed' ? '#c62828' : '#666';
+        html += `<tr>
+          <td>${esc(m.contact_name || '')}</td>
+          <td>${esc(m.recipient || '')}</td>
+          <td style="color:${statusColor}">${esc(m.status)}</td>
+          <td style="font-size:12px;color:#c62828">${esc(m.error_message || '')}</td>
+          <td style="font-size:12px">${esc(m.sent_at || m.created_at || '')}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+    }
+
+    document.getElementById('campDetailBody').innerHTML = html;
+  } catch(e) {
+    document.getElementById('campDetailBody').innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+// ============================================================
+// Shared: Pagination
+// ============================================================
+function renderPagination(containerId, page, totalPages, total, fnName) {
+  const el = document.getElementById(containerId);
+  if (totalPages <= 1) {
+    el.innerHTML = `<span style="color:#999;font-size:13px">共 ${total} 筆</span>`;
+    return;
+  }
+  let html = `<button class="page-btn" onclick="${fnName}(${page-1})" ${page<=1?'disabled':''}>上一頁</button>`;
+  const start = Math.max(1, page - 3);
+  const end = Math.min(totalPages, page + 3);
+  if (start > 1) html += `<button class="page-btn" onclick="${fnName}(1)">1</button>`;
+  if (start > 2) html += `<span style="padding:8px">...</span>`;
+  for (let i = start; i <= end; i++) {
+    html += `<button class="page-btn ${i===page?'active':''}" onclick="${fnName}(${i})">${i}</button>`;
+  }
+  if (end < totalPages - 1) html += `<span style="padding:8px">...</span>`;
+  if (end < totalPages) html += `<button class="page-btn" onclick="${fnName}(${totalPages})">${totalPages}</button>`;
+  html += `<button class="page-btn" onclick="${fnName}(${page+1})" ${page>=totalPages?'disabled':''}>下一頁</button>`;
+  html += `<span style="padding:8px;color:#999;font-size:13px">共 ${total} 筆</span>`;
+  el.innerHTML = html;
+}
+
+// ============================================================
+// SMS System
+// ============================================================
+async function loadSmsStats() {
+  try {
+    const r = await fetch('/api/sms/stats');
+    const s = await r.json();
+    document.getElementById('smsTodaySent').textContent = (s.today_sent || 0).toLocaleString();
+    document.getElementById('smsTodaySuccess').textContent = (s.today_success || 0).toLocaleString();
+    document.getElementById('smsPending').textContent = (s.pending_private || 0).toLocaleString();
+    document.getElementById('smsTotalSent').textContent = (s.total_sent || 0).toLocaleString();
+
+    // 最後發送狀態
+    const statusEl = document.getElementById('smsLastRunStatus');
+    if (s.last_run) {
+      const run = s.last_run;
+      const statusClass = run.status === 'completed' ? 'success' : (run.status === 'error' ? 'error' : 'running');
+      const statusText = run.status === 'completed' ? '完成' : (run.status === 'error' ? '失敗' : '執行中');
+      const startTime = run.started_at ? run.started_at.replace('T', ' ').substring(0, 16) : '-';
+      statusEl.className = 'scraper-status ' + statusClass;
+      statusEl.innerHTML = `<span class="status-label status-${statusClass}">最後發送${statusText}</span>` +
+        `<span>${startTime}</span>` +
+        `<span style="margin-left:12px">發送:${run.sent_count || 0} 成功:${run.success_count || 0} 失敗:${run.failed_count || 0}</span>`;
+      statusEl.style.display = 'block';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  } catch(e) { console.error('loadSmsStats:', e); }
+}
+
+async function loadSmsTemplates() {
+  try {
+    const r = await fetch('/api/sms/templates');
+    const data = await r.json();
+    const container = document.getElementById('smsTemplateList');
+    if (!data.templates || data.templates.length === 0) {
+      container.innerHTML = '<div style="color:#aaa;font-size:13px;padding:10px 0">尚無模板，請新增</div>';
+      return;
+    }
+    let html = '';
+    for (const t of data.templates) {
+      const active = t.is_active ? '<span class="badge badge-new">啟用中</span>' : '';
+      html += `<div class="template-item ${t.is_active ? 'active' : ''}" style="padding:12px;border:1px solid #eee;border-radius:6px;margin-bottom:8px;${t.is_active ? 'border-color:#1b7f37;background:#f8fff8' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <b>${esc(t.name)}</b> ${active}
+        </div>
+        <div class="template-content" style="font-size:13px;color:#555;white-space:pre-wrap;margin-bottom:8px">${esc(t.content)}</div>
+        <div style="display:flex;gap:6px">
+          ${!t.is_active ? `<button class="btn btn-sm btn-green" onclick="activateTemplate(${t.id})">設為啟用</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="editTemplate(${t.id}, '${esc(t.name)}', '${esc(t.content).replace(/'/g,"\\'")}')">編輯</button>
+          <button class="btn btn-sm btn-outline" style="color:#c62828" onclick="deleteTemplate(${t.id})">刪除</button>
+        </div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch(e) { console.error('loadSmsTemplates:', e); }
+}
+
+function showAddTemplateForm() {
+  document.getElementById('editTemplateId').value = '';
+  document.getElementById('templateName').value = '';
+  document.getElementById('templateContent').value = '';
+  document.getElementById('templateCharCount').textContent = '0';
+  document.getElementById('smsTemplateForm').style.display = 'block';
+}
+
+function hideTemplateForm() {
+  document.getElementById('smsTemplateForm').style.display = 'none';
+}
+
+function editTemplate(id, name, content) {
+  document.getElementById('editTemplateId').value = id;
+  document.getElementById('templateName').value = name;
+  document.getElementById('templateContent').value = content;
+  document.getElementById('templateCharCount').textContent = content.length;
+  document.getElementById('smsTemplateForm').style.display = 'block';
+}
+
+async function saveTemplate() {
+  const id = document.getElementById('editTemplateId').value;
+  const name = document.getElementById('templateName').value.trim();
+  const content = document.getElementById('templateContent').value.trim();
+  if (!name || !content) { alert('請填寫名稱和內容'); return; }
+
+  const url = id ? `/api/sms/templates/${id}` : '/api/sms/templates';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const r = await fetch(url, {
+      method, headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, content })
+    });
+    const data = await r.json();
+    if (data.success || data.id) {
+      hideTemplateForm();
+      loadSmsTemplates();
+    } else {
+      alert('儲存失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) { alert('儲存失敗: ' + e.message); }
+}
+
+async function activateTemplate(id) {
+  try {
+    await fetch(`/api/sms/templates/${id}/activate`, { method: 'POST' });
+    loadSmsTemplates();
+  } catch(e) { alert('操作失敗'); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('確定要刪除此模板？')) return;
+  try {
+    await fetch(`/api/sms/templates/${id}`, { method: 'DELETE' });
+    loadSmsTemplates();
+  } catch(e) { alert('刪除失敗'); }
+}
+
+async function loadSmsConfig() {
+  try {
+    const r = await fetch('/api/sms/config');
+    const config = await r.json();
+    if (config.onewaysms) {
+      document.getElementById('smsEnabled').checked = config.onewaysms.enabled || false;
+      document.getElementById('smsApiUsername').value = config.onewaysms.api_username || '';
+      document.getElementById('smsApiPassword').value = config.onewaysms.api_password || '';
+      document.getElementById('smsSenderId').value = config.onewaysms.sender_id || '28Car';
+    }
+    if (config.settings) {
+      document.getElementById('smsDailyLimit').value = config.settings.daily_limit || 100;
+      document.getElementById('smsSendWindowStart').value = config.settings.send_window_start || '10:00';
+      document.getElementById('smsSendWindowEnd').value = config.settings.send_window_end || '11:00';
+    }
+  } catch(e) { console.error('loadSmsConfig:', e); }
+}
+
+async function saveSmsConfig() {
+  const config = {
+    onewaysms: {
+      enabled: document.getElementById('smsEnabled').checked,
+      api_username: document.getElementById('smsApiUsername').value,
+      api_password: document.getElementById('smsApiPassword').value,
+      sender_id: document.getElementById('smsSenderId').value,
+    },
+    settings: {
+      daily_limit: parseInt(document.getElementById('smsDailyLimit').value) || 100,
+      send_window_start: document.getElementById('smsSendWindowStart').value || '10:00',
+      send_window_end: document.getElementById('smsSendWindowEnd').value || '11:00',
+    }
+  };
+
+  try {
+    const r = await fetch('/api/sms/config', {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+    const data = await r.json();
+    if (data.success) {
+      alert('設定已儲存');
+    } else {
+      alert('儲存失敗');
+    }
+  } catch(e) { alert('儲存失敗: ' + e.message); }
+}
+
+// SMS 發送來源相關
+let selectedSmsSource = 'private';
+let smsSourceStats = {};
+
+async function loadSmsSourceStats() {
+  try {
+    const r = await fetch('/api/sms/source-stats');
+    smsSourceStats = await r.json();
+    document.getElementById('sourcePrivateCount').textContent = smsSourceStats.private || 0;
+    document.getElementById('sourceTodayCount').textContent = smsSourceStats.today_new || 0;
+    document.getElementById('sourceCrmCount').textContent = smsSourceStats.crm_campaign || 0;
+  } catch(e) { console.error('loadSmsSourceStats:', e); }
+}
+
+function selectSmsSource(source) {
+  selectedSmsSource = source;
+  // 更新選中狀態
+  document.querySelectorAll('.source-option').forEach(el => {
+    el.style.border = '2px solid transparent';
+  });
+  event.currentTarget.style.border = '2px solid rgba(255,255,255,0.8)';
+  event.currentTarget.querySelector('input[type=radio]').checked = true;
+}
+
+async function showSendConfirm() {
+  // 載入模板
+  try {
+    const r = await fetch('/api/sms/templates');
+    const data = await r.json();
+    const activeTemplate = data.templates.find(t => t.is_active);
+    
+    if (!activeTemplate) {
+      alert('請先建立並啟用一個簡訊模板');
+      return;
+    }
+    
+    // 取得發送數量
+    const count = smsSourceStats[selectedSmsSource] || 0;
+    const limit = parseInt(document.getElementById('smsDailyLimit').value) || 100;
+    const actualCount = Math.min(count, limit);
+    
+    // 更新確認對話框
+    const sourceNames = {
+      'private': '聯絡人目錄 - 私人賣家',
+      'today_new': '今日新增/更新',
+      'crm_campaign': '活動名單'
+    };
+    document.getElementById('confirmSourceName').textContent = sourceNames[selectedSmsSource];
+    document.getElementById('confirmCount').textContent = actualCount;
+    document.getElementById('confirmTemplateName').textContent = activeTemplate.name;
+    document.getElementById('confirmTemplateContent').textContent = activeTemplate.content;
+    
+    openModal('smsSendConfirmModal');
+  } catch(e) {
+    alert('載入失敗: ' + e.message);
+  }
+}
+
+async function executeSendSms() {
+  closeModal('smsSendConfirmModal');
+  
+  try {
+    const r = await fetch('/api/sms/send-now', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ source: selectedSmsSource })
+    });
+    const data = await r.json();
+    
+    if (data.success) {
+      alert('簡訊發送任務已啟動！請稍後查看發送記錄。');
+      // 重新載入統計和記錄
+      setTimeout(() => {
+        loadSmsStats();
+        loadSmsSourceStats();
+        loadSmsLogs(1);
+      }, 2000);
+    } else {
+      alert('發送失敗: ' + data.error);
+    }
+  } catch(e) {
+    alert('發送失敗: ' + e.message);
+  }
+}
+
+async function loadSmsLogs(page = 1) {
+  const status = document.getElementById('smsLogFilter').value;
+  const params = new URLSearchParams({ page, per_page: 20, status });
+
+  try {
+    const r = await fetch(`/api/sms/logs?${params}`);
+    const data = await r.json();
+    const container = document.getElementById('smsLogList');
+
+    if (!data.logs || data.logs.length === 0) {
+      container.innerHTML = '<div style="color:#aaa;font-size:13px;padding:20px;text-align:center">尚無發送記錄</div>';
+      document.getElementById('smsLogPagination').innerHTML = '';
+      return;
+    }
+
+    let html = '<table class="data-table"><thead><tr><th>時間</th><th>電話</th><th>聯絡人</th><th>狀態</th><th>結果</th><th>操作</th></tr></thead><tbody>';
+    for (const log of data.logs) {
+      const statusBadge = log.status === 'success'
+        ? '<span class="badge badge-new">成功</span>'
+        : '<span class="badge" style="background:#ffebee;color:#c62828">失敗</span>';
+      const sentAt = log.sent_at ? log.sent_at.replace('T', ' ').substring(0, 16) : '-';
+      const result = log.status === 'success' ? (log.transaction_id || '-') : (log.error_message || log.error_code || '-');
+      // 把 log 資料存到 data 屬性
+      const logData = encodeURIComponent(JSON.stringify(log));
+      html += `<tr>
+        <td style="font-size:12px">${esc(sentAt)}</td>
+        <td>${esc(log.phone)}</td>
+        <td>${esc(log.canonical_name || '-')}</td>
+        <td>${statusBadge}</td>
+        <td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis">${esc(result)}</td>
+        <td><button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="showSmsDetail('${logData}')">詳情</button></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    renderPagination('smsLogPagination', data.page, data.total_pages, data.total, 'loadSmsLogs');
+  } catch(e) { console.error('loadSmsLogs:', e); }
+}
+
+function showSmsDetail(encodedData) {
+  try {
+    const log = JSON.parse(decodeURIComponent(encodedData));
+    const statusText = log.status === 'success' ? '<span style="color:#1b7f37;font-weight:600">發送成功</span>' : '<span style="color:#c62828;font-weight:600">發送失敗</span>';
+    const sentAt = log.sent_at ? log.sent_at.replace('T', ' ') : '-';
+
+    let html = `
+      <table style="width:100%;border-collapse:collapse">
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666;width:100px">發送狀態</td>
+          <td style="padding:10px 0">${statusText}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">發送時間</td>
+          <td style="padding:10px 0">${esc(sentAt)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">收件電話</td>
+          <td style="padding:10px 0">${esc(log.phone)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">聯絡人</td>
+          <td style="padding:10px 0">${esc(log.canonical_name || '-')}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">使用模板</td>
+          <td style="padding:10px 0">${esc(log.template_name || '-')}</td>
+        </tr>`;
+
+    if (log.status === 'success') {
+      html += `
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">交易 ID</td>
+          <td style="padding:10px 0;font-family:monospace">${esc(log.transaction_id || '-')}</td>
+        </tr>`;
+    } else {
+      html += `
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">錯誤碼</td>
+          <td style="padding:10px 0;color:#c62828">${esc(log.error_code || '-')}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:10px 0;color:#666">錯誤訊息</td>
+          <td style="padding:10px 0;color:#c62828">${esc(log.error_message || '-')}</td>
+        </tr>`;
+    }
+
+    html += `
+      </table>
+      <div style="margin-top:15px">
+        <div style="color:#666;margin-bottom:5px">發送內容</div>
+        <div style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;white-space:pre-wrap;max-height:200px;overflow-y:auto">${esc(log.message || '(無內容)')}</div>
+      </div>`;
+
+    document.getElementById('smsDetailContent').innerHTML = html;
+    openModal('smsDetailModal');
+  } catch(e) {
+    console.error('showSmsDetail:', e);
+    alert('無法顯示詳情');
+  }
+}
+
+// 模板內容字數計算
+document.addEventListener('DOMContentLoaded', () => {
+  const textarea = document.getElementById('templateContent');
+  if (textarea) {
+    textarea.addEventListener('input', () => {
+      document.getElementById('templateCharCount').textContent = textarea.value.length;
+    });
+  }
+});
+
+// ============================================================
+// Shared: Modal helpers
+// ============================================================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ============================================================
+// Shared: Escape HTML
+// ============================================================
+function esc(s) { if(!s) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
+// 格式化更新日期 (標準格式 YYYY-MM-DD HH:MM)
+function formatUpdatedAt(s) {
+  if (!s) return null;
+  // 標準格式: YYYY-MM-DD HH:MM (如 2026-02-10 02:08)
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
+  if (m) {
+    const year = m[1], month = m[2], day = m[3], time = m[4];
+    // YYYY-MM-DD HH:MM -> MM/DD HH:MM
+    return `${month}/${day} ${time}`;
+  }
+  return s; // 無法解析則原樣返回
+}
+
+// ============================================================
+// Keyboard
+// ============================================================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
+
+// ============================================================
+// 認證系統
+// ============================================================
+let currentUser = null;
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/me');
+    const data = await r.json();
+    if (data.authenticated) {
+      currentUser = data.user;
+      showLoggedInUI();
+      if (data.user.must_change_pwd) {
+        document.getElementById('pwdChangeModal').classList.remove('hidden');
+      }
+      return true;
+    }
+  } catch(e) {
+    console.error('checkAuth error:', e);
+  }
+  currentUser = null;
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  return false;
+}
+
+function showLoggedInUI() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('userInfoArea').style.display = 'flex';
+  document.getElementById('currentUserName').textContent = currentUser.display_name || currentUser.username;
+
+  const roleEl = document.getElementById('currentUserRole');
+  if (currentUser.role === 'admin') {
+    roleEl.textContent = '管理員';
+    roleEl.classList.add('admin');
+    document.getElementById('adminBtn').style.display = 'inline-block';
+  } else {
+    roleEl.textContent = '一般使用者';
+    roleEl.classList.remove('admin');
+    document.getElementById('adminBtn').style.display = 'none';
+  }
+
+  applyPermissions();
+}
+
+function applyPermissions() {
+  // 一般使用者隱藏 CRM/SMS Tab
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  document.getElementById('tabCrmBtn').style.display = isAdmin ? '' : 'none';
+  document.getElementById('tabSmsBtn').style.display = isAdmin ? '' : 'none';
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const errorEl = document.getElementById('loginError');
+
+  btn.disabled = true;
+  btn.textContent = '登入中...';
+  errorEl.classList.remove('show');
+
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('loginUsername').value,
+        password: document.getElementById('loginPassword').value
+      })
+    });
+    const data = await r.json();
+
+    if (r.ok && data.success) {
+      currentUser = data.user;
+      showLoggedInUI();
+      if (data.user.must_change_pwd) {
+        document.getElementById('pwdChangeModal').classList.remove('hidden');
+      } else {
+        init();
+      }
+    } else {
+      errorEl.textContent = data.error || '登入失敗';
+      errorEl.classList.add('show');
+    }
+  } catch(e) {
+    errorEl.textContent = '網路錯誤，請稍後再試';
+    errorEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '登入';
+}
+
+async function handleLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch(e) {}
+  currentUser = null;
+  document.getElementById('userInfoArea').style.display = 'none';
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+}
+
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('pwdChangeError');
+  const newPwd = document.getElementById('newPassword').value;
+  const confirmPwd = document.getElementById('confirmPassword').value;
+
+  if (newPwd !== confirmPwd) {
+    errorEl.textContent = '兩次輸入的密碼不一致';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        old_password: document.getElementById('oldPassword').value,
+        new_password: newPwd
+      })
+    });
+    const data = await r.json();
+
+    if (r.ok && data.success) {
+      currentUser.must_change_pwd = 0;
+      document.getElementById('pwdChangeModal').classList.add('hidden');
+      alert('密碼更改成功！');
+      init();
+    } else {
+      errorEl.textContent = data.error || '更改失敗';
+      errorEl.classList.add('show');
+    }
+  } catch(e) {
+    errorEl.textContent = '網路錯誤';
+    errorEl.classList.add('show');
+  }
+}
+
+
+// ============================================================
+// 管理後台
+// ============================================================
+function openAdminPanel() {
+  openModal('adminModal');
+  switchAdminTab('users');
+}
+
+function switchAdminTab(tab) {
+  ['users', 'logs', 'network'].forEach(t => {
+    document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+    document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('btn-outline', t !== tab);
+    document.getElementById('adminPanel' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'users') loadAdminUsers();
+  if (tab === 'logs') loadAdminLogs(1);
+  if (tab === 'network') loadNetworkInfo();
+}
+
+async function loadAdminUsers() {
+  try {
+    const r = await fetch('/api/admin/users');
+    const data = await r.json();
+    const tbody = document.getElementById('userTableBody');
+    tbody.innerHTML = data.users.map(u => `
+      <tr>
+        <td>${u.id}</td>
+        <td>${esc(u.username)}</td>
+        <td>${esc(u.display_name || '-')}</td>
+        <td><span class="role-badge ${u.role}">${u.role === 'admin' ? '管理員' : '一般'}</span></td>
+        <td><span class="status-badge ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? '啟用' : '停用'}</span></td>
+        <td style="font-size:12px;color:#888">${u.last_login_at ? u.last_login_at.substring(0, 16).replace('T', ' ') : '-'}</td>
+        <td class="action-btns">
+          <button class="btn btn-sm btn-outline" onclick="showEditUserModal(${u.id})">編輯</button>
+          ${u.username !== 'admin' ? `<button class="btn btn-sm btn-outline" style="color:#c00" onclick="deleteUser(${u.id}, '${esc(u.username)}')">刪除</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    console.error('loadAdminUsers:', e);
+  }
+}
+
+function showAddUserForm() {
+  const area = document.getElementById('addUserFormArea');
+  if (area.innerHTML) { area.innerHTML = ''; return; }
+  area.innerHTML = `
+    <div class="add-user-form">
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>帳號</label>
+          <input type="text" id="newUsername" placeholder="登入帳號">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>密碼</label>
+          <input type="password" id="newPassword" placeholder="至少6字元">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>顯示名稱</label>
+          <input type="text" id="newDisplayName" placeholder="用於溝通紀錄">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>角色</label>
+          <select id="newRole">
+            <option value="user">一般使用者</option>
+            <option value="admin">管理員</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <input type="checkbox" id="newMustChangePwd" checked> 首次登入強制改密碼
+        </label>
+        <div style="flex:1"></div>
+        <button class="btn btn-sm" onclick="saveNewUser()">建立</button>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('addUserFormArea').innerHTML=''">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+async function saveNewUser() {
+  const data = {
+    username: document.getElementById('newUsername').value,
+    password: document.getElementById('newPassword').value,
+    display_name: document.getElementById('newDisplayName').value,
+    role: document.getElementById('newRole').value,
+    must_change_pwd: document.getElementById('newMustChangePwd').checked ? 1 : 0
+  };
+  if (!data.username || !data.password) {
+    alert('請輸入帳號和密碼');
+    return;
+  }
+  try {
+    const r = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await r.json();
+    if (r.ok && result.success) {
+      document.getElementById('addUserFormArea').innerHTML = '';
+      loadAdminUsers();
+    } else {
+      alert(result.error || '建立失敗');
+    }
+  } catch(e) {
+    alert('網路錯誤');
+  }
+}
+
+async function showEditUserModal(userId) {
+  try {
+    const r = await fetch('/api/admin/users');
+    const data = await r.json();
+    const user = data.users.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('editUsername').value = user.username;
+    document.getElementById('editDisplayName').value = user.display_name || '';
+    document.getElementById('editRole').value = user.role;
+    document.getElementById('editIsActive').value = user.is_active ? '1' : '0';
+    document.getElementById('editPassword').value = '';
+    document.getElementById('editMustChangePwd').checked = false;
+
+    openModal('editUserModal');
+  } catch(e) {
+    alert('載入失敗');
+  }
+}
+
+async function saveEditUser() {
+  const userId = document.getElementById('editUserId').value;
+  const data = {
+    display_name: document.getElementById('editDisplayName').value,
+    role: document.getElementById('editRole').value,
+    is_active: document.getElementById('editIsActive').value === '1'
+  };
+  const newPwd = document.getElementById('editPassword').value;
+  if (newPwd) {
+    if (newPwd.length < 6) {
+      alert('密碼至少需要6個字元');
+      return;
+    }
+    data.password = newPwd;
+    data.must_change_pwd = document.getElementById('editMustChangePwd').checked ? 1 : 0;
+  }
+  try {
+    const r = await fetch(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await r.json();
+    if (r.ok && result.success) {
+      closeModal('editUserModal');
+      loadAdminUsers();
+    } else {
+      alert(result.error || '更新失敗');
+    }
+  } catch(e) {
+    alert('網路錯誤');
+  }
+}
+
+async function deleteUser(userId, username) {
+  if (!confirm(`確定要刪除使用者「${username}」嗎？此操作無法復原。`)) return;
+  try {
+    const r = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+    const result = await r.json();
+    if (r.ok && result.success) {
+      loadAdminUsers();
+    } else {
+      alert(result.error || '刪除失敗');
+    }
+  } catch(e) {
+    alert('網路錯誤');
+  }
+}
+
+let adminLogPage = 1;
+async function loadAdminLogs(page) {
+  adminLogPage = page;
+  const params = new URLSearchParams({ page, per_page: 20 });
+  const username = document.getElementById('logFilterUsername').value;
+  const action = document.getElementById('logFilterAction').value;
+  const dateFrom = document.getElementById('logFilterFrom').value;
+  const dateTo = document.getElementById('logFilterTo').value;
+  if (username) params.append('username', username);
+  if (action) params.append('action', action);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+
+  try {
+    const r = await fetch('/api/admin/logs?' + params);
+    const data = await r.json();
+    const tbody = document.getElementById('logTableBody');
+    tbody.innerHTML = data.logs.map(l => `
+      <tr>
+        <td style="font-size:12px">${l.created_at ? l.created_at.substring(0, 16).replace('T', ' ') : '-'}</td>
+        <td>${esc(l.username || '-')}</td>
+        <td><span style="padding:2px 6px;background:#e3f2fd;border-radius:4px;font-size:12px">${esc(l.action)}</span></td>
+        <td style="font-size:12px">${l.target_type ? `${esc(l.target_type)}:${esc(l.target_id || '')}` : '-'}</td>
+        <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${l.details ? esc(l.details).substring(0, 50) : '-'}</td>
+        <td style="font-size:12px;color:#888">${esc(l.ip_address || '-')}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="6" style="text-align:center;color:#888">沒有記錄</td></tr>';
+
+    // 分頁
+    const pagination = document.getElementById('logPagination');
+    if (data.total_pages > 1) {
+      let html = '';
+      for (let i = 1; i <= data.total_pages; i++) {
+        html += `<button class="btn btn-sm ${i === page ? '' : 'btn-outline'}" onclick="loadAdminLogs(${i})" style="margin:0 2px">${i}</button>`;
+      }
+      pagination.innerHTML = html;
+    } else {
+      pagination.innerHTML = '';
+    }
+  } catch(e) {
+    console.error('loadAdminLogs:', e);
+  }
+}
+
+async function loadNetworkInfo() {
+  try {
+    const r = await fetch('/api/admin/network-info');
+    const data = await r.json();
+    document.getElementById('networkHostname').textContent = data.hostname;
+    document.getElementById('networkIP').textContent = data.local_ip;
+    document.getElementById('networkPort').textContent = data.port;
+    document.getElementById('networkURL').textContent = data.url;
+  } catch(e) {
+    console.error('loadNetworkInfo:', e);
+  }
+}
+
+function copyNetworkURL() {
+  const url = document.getElementById('networkURL').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    alert('已複製到剪貼簿：' + url);
+  }).catch(() => {
+    prompt('請手動複製：', url);
+  });
+}
+
+
+
+// Go
+(async function() {
+  const loggedIn = await checkAuth();
+  if (loggedIn && !currentUser.must_change_pwd) {
+    init();
+  }
+})();
+
+// ============================================================
+// 伺服器重啟功能
+// ============================================================
+
+function showRestartModal() {
+  document.getElementById('restartModal').classList.add('show');
+  // 重設狀態
+  document.getElementById('restartIcon').className = 'restart-icon';
+  document.getElementById('restartIcon').innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+  document.getElementById('restartTitle').textContent = '重啟伺服器';
+  document.getElementById('restartMessage').textContent = '確定要重啟伺服器嗎？這將中斷所有目前的連線。';
+  document.getElementById('restartProgress').style.display = 'none';
+  document.getElementById('restartProgressBar').style.width = '0%';
+  document.getElementById('restartButtons').innerHTML = '<button class="btn btn-secondary" onclick="hideRestartModal()">取消</button><button class="btn" onclick="executeRestart()">確定重啟</button>';
+}
+
+function hideRestartModal() {
+  document.getElementById('restartModal').classList.remove('show');
+}
+
+async function executeRestart() {
+  const icon = document.getElementById('restartIcon');
+  const title = document.getElementById('restartTitle');
+  const message = document.getElementById('restartMessage');
+  const progress = document.getElementById('restartProgress');
+  const progressBar = document.getElementById('restartProgressBar');
+  const buttons = document.getElementById('restartButtons');
+
+  // 顯示重啟中狀態
+  icon.classList.add('spinning');
+  title.textContent = '正在重啟...';
+  message.textContent = '伺服器正在關閉並重新啟動';
+  progress.style.display = 'block';
+  buttons.innerHTML = '';
+
+  let progressValue = 0;
+  const progressInterval = setInterval(() => {
+    progressValue += 5;
+    if (progressValue <= 30) {
+      progressBar.style.width = progressValue + '%';
+    }
+  }, 100);
+
+  try {
+    // 發送重啟請求
+    await fetch('/api/server/restart', { method: 'POST' });
+
+    // 等待伺服器關閉
+    message.textContent = '伺服器正在關閉...';
+    progressBar.style.width = '40%';
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 開始檢查伺服器是否重啟成功
+    message.textContent = '等待伺服器重新啟動...';
+    progressBar.style.width = '60%';
+
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const checkHealth = async () => {
+      attempts++;
+      progressBar.style.width = (60 + (attempts / maxAttempts) * 40) + '%';
+
+      try {
+        const response = await fetch('/api/server/health', {
+          signal: AbortSignal.timeout(2000)
+        });
+        if (response.ok) {
+          clearInterval(progressInterval);
+          // 重啟成功
+          icon.classList.remove('spinning');
+          icon.classList.add('success');
+          icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+          title.textContent = '重啟成功！';
+          message.textContent = '伺服器已成功重新啟動';
+          progressBar.style.width = '100%';
+          buttons.innerHTML = '<button class="btn" onclick="hideRestartModal()">確定</button>';
+          return;
+        }
+      } catch (e) {
+        // 伺服器尚未就緒
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(checkHealth, 1000);
+      } else {
+        clearInterval(progressInterval);
+        // 重啟失敗
+        icon.classList.remove('spinning');
+        icon.classList.add('error');
+        icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+        title.textContent = '重啟失敗';
+        message.textContent = '無法連線到伺服器，請手動檢查';
+        buttons.innerHTML = '<button class="btn btn-secondary" onclick="hideRestartModal()">關閉</button><button class="btn" onclick="executeRestart()">重試</button>';
+      }
+    };
+
+    setTimeout(checkHealth, 3000);
+
+  } catch (error) {
+    clearInterval(progressInterval);
+    // 立即失敗
+    message.textContent = '發送重啟請求失敗：' + error.message;
+    icon.classList.remove('spinning');
+    icon.classList.add('error');
+    buttons.innerHTML = '<button class="btn btn-secondary" onclick="hideRestartModal()">關閉</button>';
+  }
+}
+
+
+// ============================================================
+// 深色模式切換
+// ============================================================
+
+function toggleDarkMode() {
+  const body = document.body;
+  const isDark = body.classList.toggle('dark-mode');
+
+  // 更新按鈕圖示和文字
+  document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
+  document.getElementById('themeText').textContent = isDark ? '淺色' : '深色';
+
+  // 儲存偏好
+  localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+}
+
+// 頁面載入時檢查儲存的偏好
+function initDarkMode() {
+  const savedMode = localStorage.getItem('darkMode');
+  if (savedMode === 'true') {
+    document.body.classList.add('dark-mode');
+    document.getElementById('themeIcon').textContent = '☀️';
+    document.getElementById('themeText').textContent = '淺色';
+  }
+}
+
+// 在頁面載入時初始化
+document.addEventListener('DOMContentLoaded', initDarkMode);
+
+
+// ============================================================
+// SMS 設定鎖定/解鎖功能
+// ============================================================
+
+let smsConfigLocked = false;
+
+function lockSmsConfig() {
+  smsConfigLocked = true;
+  const fields = ['smsEnabled', 'smsApiUsername', 'smsApiPassword', 'smsSenderId', 'smsDailyLimit', 'smsSendWindowStart', 'smsSendWindowEnd'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+  document.getElementById('smsConfigButtons').innerHTML = '<button class="btn btn-outline" onclick="unlockSmsConfig()">🔓 編輯設定</button>';
+}
+
+function unlockSmsConfig() {
+  smsConfigLocked = false;
+  const fields = ['smsEnabled', 'smsApiUsername', 'smsApiPassword', 'smsSenderId', 'smsDailyLimit', 'smsSendWindowStart', 'smsSendWindowEnd'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+  document.getElementById('smsConfigButtons').innerHTML = '<button class="btn" onclick="saveSmsConfig()">儲存設定</button>';
+}
+
+// Override saveSmsConfig to lock after save
+const originalSaveSmsConfig = saveSmsConfig;
+saveSmsConfig = async function() {
+  await originalSaveSmsConfig();
+  lockSmsConfig();
+};
+
+// Override loadSmsConfig to lock if config exists
+const originalLoadSmsConfig = loadSmsConfig;
+loadSmsConfig = async function() {
+  await originalLoadSmsConfig();
+  // Lock if username is set
+  const username = document.getElementById('smsApiUsername').value;
+  if (username && username.trim()) {
+    lockSmsConfig();
+  }
+};
+
+
+// ============================================================
+// CRM Campaign 篩選功能
+// ============================================================
+
+async function previewCampaignTargets() {
+  const classification = document.getElementById('campFilterClass').value;
+  const intention = document.getElementById('campFilterIntention').value;
+  const hasLogs = document.getElementById('campFilterHasLogs').value;
+  const lastDays = document.getElementById('campFilterLastDays').value;
+  const contactedBy = document.getElementById('campFilterContactedBy').value;
+  const updateDays = document.getElementById('campFilterUpdateDays').value;
+  const priceChanged = document.getElementById('campFilterPriceChanged').value;
+
+  const params = new URLSearchParams({ per_page: 10, has_phone: 'yes' });
+  if (classification) params.append('classification', classification);
+  if (intention) params.append('intention', intention);
+  if (hasLogs) params.append('has_logs', hasLogs);
+  if (lastDays) params.append('last_days', lastDays);
+  if (contactedBy) params.append('contacted_by', contactedBy);
+  if (updateDays) params.append('update_days', updateDays);
+  if (priceChanged) params.append('price_changed', priceChanged);
+
+  try {
+    const r = await fetch('/api/contacts?' + params.toString());
+    const data = await r.json();
+
+    document.getElementById('campTargetCount').textContent = data.total + ' 人';
+
+    let preview = '目標名單預覽 (前10筆):\n\n';
+    data.contacts.forEach((c, i) => {
+      preview += (i+1) + '. ' + c.canonical_name + ' - ' + c.canonical_phone + '\n';
+    });
+    if (data.total > 10) {
+      preview += '\n... 還有 ' + (data.total - 10) + ' 人';
+    }
+    alert(preview);
+  } catch(e) {
+    alert('預覽失敗: ' + e.message);
+  }
+}
+
+function updateCampaignTargetCount() {
+  const classification = document.getElementById('campFilterClass').value;
+  const intention = document.getElementById('campFilterIntention').value;
+  const hasLogs = document.getElementById('campFilterHasLogs').value;
+  const lastDays = document.getElementById('campFilterLastDays').value;
+  const contactedBy = document.getElementById('campFilterContactedBy').value;
+  const updateDays = document.getElementById('campFilterUpdateDays').value;
+  const priceChanged = document.getElementById('campFilterPriceChanged').value;
+
+  const params = new URLSearchParams({ per_page: 1, has_phone: 'yes' });
+  if (classification) params.append('classification', classification);
+  if (intention) params.append('intention', intention);
+  if (hasLogs) params.append('has_logs', hasLogs);
+  if (lastDays) params.append('last_days', lastDays);
+  if (contactedBy) params.append('contacted_by', contactedBy);
+  if (updateDays) params.append('update_days', updateDays);
+  if (priceChanged) params.append('price_changed', priceChanged);
+
+  fetch('/api/contacts?' + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('campTargetCount').textContent = data.total + ' 人';
+    })
+    .catch(() => {
+      document.getElementById('campTargetCount').textContent = '錯誤';
+    });
+}
+
+
+
+// 載入活動聯絡人篩選選項
+async function loadCampContactedByOptions() {
+  try {
+    const r = await fetch('/api/contacts/contacted-by-options');
+    const data = await r.json();
+    const select = document.getElementById('campFilterContactedBy');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">全部</option>';
+    for (const name of data.options) {
+      select.innerHTML += `<option value="${esc(name)}">${esc(name)}</option>`;
+    }
+    if (currentVal) select.value = currentVal;
+  } catch(e) {
+    console.error('Failed to load contacted by options:', e);
+  }
+}
+
+// ============================================================
+// CRM Campaign 管理功能
+// ============================================================
+
+async function executeCampaign(campaignId) {
+  if (!confirm('確定要執行此活動嗎？將根據篩選條件發送訊息給目標聯絡人。')) return;
+
+  try {
+    const r = await fetch('/api/crm/campaign/' + campaignId + '/execute', { method: 'POST' });
+    const data = await r.json();
+    alert('執行完成！\n已排入佇列：' + data.queued + ' 人\n略過：' + data.skipped + ' 人');
+    loadCampaigns();
+  } catch(e) {
+    alert('執行失敗: ' + e.message);
+  }
+}
+
+async function editCampaign(campaignId) {
+  try {
+    const r = await fetch('/api/crm/campaign/' + campaignId);
+    const camp = await r.json();
+
+    openModal('campaignModal');
+    document.getElementById('campName').value = camp.name || '';
+    document.getElementById('campType').value = camp.type || 'sms';
+    
+
+    let filter = {};
+    try { filter = JSON.parse(camp.target_filter || '{}'); } catch(e) {}
+
+    document.getElementById('campFilterClass').value = filter.classification || '';
+    document.getElementById('campFilterIntention').value = filter.intention || '';
+    document.getElementById('campFilterCarCount').value = filter.car_count || '';
+    document.getElementById('campFilterHasLogs').value = filter.has_logs || '';
+    document.getElementById('campFilterLastDays').value = filter.last_days || '';
+    document.getElementById('campFilterContactedBy').value = filter.contacted_by || '';
+    document.getElementById('campFilterUpdateDays').value = filter.update_days || '';
+    document.getElementById('campFilterPriceChanged').value = filter.price_changed || '';
+    document.getElementById('campFilterExcludeSent').value = filter.exclude_sent || 'yes';
+    loadCampContactedByOptions();
+
+    // Change button to update mode
+    const modal = document.querySelector('#campaignModal .modal-body');
+    const btn = modal.querySelector('button.btn');
+    btn.textContent = '更新活動';
+    btn.onclick = function() { updateCampaign(campaignId); };
+
+    updateCampaignTargetCount();
+  } catch(e) {
+    alert('載入失敗: ' + e.message);
+  }
+}
+
+async function updateCampaign(campaignId) {
+  const name = document.getElementById('campName').value;
+  const type = document.getElementById('campType').value;
+  if (!name) { alert('請輸入活動名稱'); return; }
+
+  const target_filter = {
+    classification: document.getElementById('campFilterClass').value,
+    intention: document.getElementById('campFilterIntention').value,
+    car_count: document.getElementById('campFilterCarCount').value,
+    has_logs: document.getElementById('campFilterHasLogs').value,
+    last_days: document.getElementById('campFilterLastDays').value,
+    contacted_by: document.getElementById('campFilterContactedBy').value,
+    update_days: document.getElementById('campFilterUpdateDays').value,
+    price_changed: document.getElementById('campFilterPriceChanged').value,
+    exclude_sent: document.getElementById('campFilterExcludeSent').value
+  };
+
+  try {
+    await fetch('/api/crm/campaign/' + campaignId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type, target_filter }),
+    });
+    closeModal('campaignModal');
+    loadCampaigns();
+  } catch(e) { alert('更新失敗: ' + e.message); }
+}
+
+async function deleteCampaign(campaignId) {
+  if (!confirm('確定要刪除此活動嗎？相關的發送記錄也會一併刪除。')) return;
+
+  try {
+    await fetch('/api/crm/campaign/' + campaignId, { method: 'DELETE' });
+    loadCampaigns();
+  } catch(e) {
+    alert('刪除失敗: ' + e.message);
+  }
+}
+
+</script>
+
+<!-- Restart Modal -->
+<div class="restart-modal" id="restartModal">
+  <div class="restart-modal-content">
+    <div class="restart-icon" id="restartIcon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6"></path>
+        <path d="M1 20v-6h6"></path>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+    </div>
+    <div class="restart-title" id="restartTitle">重啟伺服器</div>
+    <div class="restart-message" id="restartMessage">確定要重啟伺服器嗎？這將中斷所有目前的連線。</div>
+    <div class="restart-progress" id="restartProgress" style="display:none">
+      <div class="restart-progress-bar" id="restartProgressBar"></div>
+    </div>
+    <div class="restart-buttons" id="restartButtons">
+      <button class="btn btn-secondary" onclick="hideRestartModal()">取消</button>
+      <button class="btn" onclick="executeRestart()">確定重啟</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,76 @@
+# ==========================================
+# 28car 車源系統 - Git 忽略清單
+# ==========================================
+
+# 資料庫檔案（每台電腦的資料不同）
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 圖片資料夾（太大，不納入版控）
+/images/
+
+# 日誌檔案
+*.log
+/logs/
+
+# Python 快取
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+
+# 虛擬環境
+/venv/
+/.venv/
+/env/
+
+# IDE 設定
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 敏感設定（如果有）
+config.local.py
+.env
+.env.local
+
+# 暫存檔案
+*.tmp
+*.temp
+*.bak
+nul
+tmpclaude-*
+
+# 匯出檔案
+*.json
+!sms_config.json
+
+# 編譯產物
+*.exe
+
+# Claude 設定
+.claude/
+
+# msgAPI（外部資料）
+msgAPI/
+
+# 舊版/測試腳本
+scrape_28car.py
+scrape_28car2.py
+investigate_28car.py
+fix_cmy_photos.py
+detail_page.html
+pic_pop.html
+write_script.py

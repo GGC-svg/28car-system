@@ -1,0 +1,17 @@
+{
+    "onewaysms": {
+        "enabled": false,
+        "api_url": "https://gateway.onewaysms.hk/api.aspx",
+        "api_username": "2131313",
+        "api_password": "321313132132",
+        "sender_id": "28Car",
+        "language_type": 2
+    },
+    "settings": {
+        "daily_limit": 100,
+        "target_classification": "private",
+        "send_window_start": "10:00",
+        "send_window_end": "11:00",
+        "delay_between_sms": 1.0
+    }
+}
