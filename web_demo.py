@@ -550,6 +550,21 @@ def api_stats():
     stats['fuels'] = [{'name': f[0], 'count': f[1]} for f in fuels]
 
     db.close()
+
+    # 加入網路資訊
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = '127.0.0.1'
+    stats['network'] = {
+        'local_ip': local_ip,
+        'port': 5000,
+        'lan_url': f'http://{local_ip}:5000'
+    }
+
     return jsonify(stats)
 
 
@@ -2158,6 +2173,86 @@ def api_admin_network_info():
         'port': 5000,
         'url': f'http://{local_ip}:5000'
     })
+
+
+@app.route('/api/admin/check-update')
+@admin_required
+def api_admin_check_update():
+    """檢查程式更新"""
+    import subprocess
+    import os
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    try:
+        # 檢查是否有 git
+        result = subprocess.run(['git', '--version'], capture_output=True, text=True, cwd=script_dir)
+        if result.returncode != 0:
+            return jsonify({'error': 'Git 未安裝', 'has_update': False})
+        
+        # 檢查是否是 git repo
+        result = subprocess.run(['git', 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=script_dir)
+        if result.returncode != 0:
+            return jsonify({'error': '此目錄不是 Git 倉庫', 'has_update': False})
+        
+        # Fetch 遠端更新
+        subprocess.run(['git', 'fetch', 'origin'], capture_output=True, text=True, cwd=script_dir)
+        
+        # 取得本地和遠端版本
+        local = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
+        remote = subprocess.run(['git', 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
+        
+        has_update = local != remote
+        
+        # 取得更新內容
+        commits = []
+        if has_update:
+            log_result = subprocess.run(
+                ['git', 'log', '--oneline', 'HEAD..origin/main'],
+                capture_output=True, text=True, cwd=script_dir
+            )
+            commits = log_result.stdout.strip().split('
+') if log_result.stdout.strip() else []
+        
+        return jsonify({
+            'has_update': has_update,
+            'local_version': local[:8],
+            'remote_version': remote[:8],
+            'commits': commits
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'has_update': False})
+
+
+@app.route('/api/admin/do-update', methods=['POST'])
+@admin_required
+def api_admin_do_update():
+    """執行程式更新"""
+    import subprocess
+    import os
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    try:
+        result = subprocess.run(
+            ['git', 'pull', 'origin', 'main', '--ff-only'],
+            capture_output=True, text=True, cwd=script_dir
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': '更新完成！請重新啟動伺服器以套用更新。',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '更新失敗',
+                'error': result.stderr
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 
 # ============================================================

@@ -1337,6 +1337,7 @@ body.dark-mode .template-item .template-content {
         <span class="user-name" id="currentUserName"></span>
         <span class="user-role" id="currentUserRole"></span>
         <button class="btn-admin" id="adminBtn" onclick="openAdminPanel()" style="display:none">管理後台</button>
+        <button class="btn-admin" id="updateBtn" onclick="checkForUpdate()" style="display:none">檢查更新</button>
         <button class="btn-logout" onclick="handleLogout()">登出</button>
       </div>
       <span id="headerTime" style="font-size:12px;color:#888"></span>
@@ -1364,6 +1365,10 @@ body.dark-mode .template-item .template-content {
   <div class="stat-item"><div class="stat-num green" id="statTodayNew">-</div><div class="stat-label">本日新增</div></div>
   <div class="stat-item"><div class="stat-num blue" id="statTodayUpdated">-</div><div class="stat-label">本日更新</div></div>
   <div class="stat-item"><div class="stat-num" id="statPhotos">-</div><div class="stat-label">已下載圖片</div></div>
+  <div class="stat-item" id="lanInfoItem" style="background:linear-gradient(135deg,#e3f2fd,#fff);border:1px solid #1976d2">
+    <div class="stat-num" style="font-size:14px;color:#1976d2" id="statLanUrl">-</div>
+    <div class="stat-label" style="color:#1976d2">區域網路連線</div>
+  </div>
 </div>
 
 <!-- 爬蟲狀態區 -->
@@ -2200,6 +2205,10 @@ async function loadStats() {
     }
     document.getElementById('statSell').textContent = sellCount.toLocaleString();
     document.getElementById('statCmy').textContent = cmyCount.toLocaleString();
+    // 顯示區域網路連線資訊
+    if (s.network) {
+      document.getElementById('statLanUrl').textContent = s.network.lan_url;
+    }
   } catch(e) { console.error('loadStats:', e); }
   loadScraperStatus();
 }
@@ -3826,6 +3835,9 @@ function applyPermissions() {
   const isAdmin = currentUser && currentUser.role === 'admin';
   document.getElementById('tabCrmBtn').style.display = isAdmin ? '' : 'none';
   document.getElementById('tabSmsBtn').style.display = isAdmin ? '' : 'none';
+  // 管理員才能看到管理後台和檢查更新
+  document.getElementById('adminBtn').style.display = isAdmin ? '' : 'none';
+  document.getElementById('updateBtn').style.display = isAdmin ? '' : 'none';
 }
 
 async function handleLogin(e) {
