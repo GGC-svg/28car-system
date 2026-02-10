@@ -2211,8 +2211,7 @@ def api_admin_check_update():
                 ['git', 'log', '--oneline', 'HEAD..origin/main'],
                 capture_output=True, text=True, cwd=script_dir
             )
-            commits = log_result.stdout.strip().split('
-') if log_result.stdout.strip() else []
+            commits = log_result.stdout.strip().split('\n') if log_result.stdout.strip() else []
         
         return jsonify({
             'has_update': has_update,
