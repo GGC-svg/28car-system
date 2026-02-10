@@ -2532,7 +2532,7 @@ async function loadContacts(page) {
       if (c.last_car_update && c.last_car_update.length >= 10) {
         const u = c.last_car_update;
         // 格式: MM/DD HH:MM
-        lastUpdate = u.substring(5,7) + '/' + u.substring(8,10) + ' ' + u.substring(11,16);
+        lastUpdate = u.substring(0,4) + '/' + u.substring(5,7) + '/' + u.substring(8,10) + ' ' + u.substring(11,16);
       }
       const lastSms = c.last_sms_sent ? c.last_sms_sent.substring(0, 10) : '';
       const intentionStatus = c.intention_status || '';
@@ -2768,7 +2768,7 @@ async function openContactDetail(groupId) {
           <td>${esc(car.year)}</td><td>${esc(car.price)}</td>
           <td>${sourceLabels[car.source]||car.source}</td>
           <td style="font-size:12px">${car.updated_at && car.updated_at.length >= 10 ?
-            car.updated_at.substring(5,7) + '/' + car.updated_at.substring(8,10) + ' ' + car.updated_at.substring(11,16) : '-'}</td>
+            car.updated_at.substring(0,4) + '/' + car.updated_at.substring(5,7) + '/' + car.updated_at.substring(8,10) + ' ' + car.updated_at.substring(11,16) : '-'}</td>
         </tr>`;
       }
       html += '</tbody></table>';
@@ -3770,8 +3770,8 @@ function formatUpdatedAt(s) {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
   if (m) {
     const year = m[1], month = m[2], day = m[3], time = m[4];
-    // YYYY-MM-DD HH:MM -> MM/DD HH:MM
-    return `${month}/${day} ${time}`;
+    // YYYY-MM-DD HH:MM -> YYYY/MM/DD HH:MM
+    return `${year}/${month}/${day} ${time}`;
   }
   return s; // 無法解析則原樣返回
 }
