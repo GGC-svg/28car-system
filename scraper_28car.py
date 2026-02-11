@@ -385,6 +385,9 @@ class Scraper28Car:
                     contact_raw = contact_b.get_text(strip=True) if contact_b else ''
                     car['description'] = full_desc.replace(contact_raw, '').strip().rstrip(',').rstrip(',')
                     car['contact_raw'] = contact_raw
+                    # 如果聯絡人資訊包含「已售」，標記為已售
+                    if '已售' in contact_raw:
+                        car['is_sold'] = 1
                 else:
                     car['description'] = ''
                     car['contact_raw'] = ''

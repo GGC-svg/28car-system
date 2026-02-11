@@ -153,16 +153,19 @@ def migrate_schema(conn):
     ''')
 
     # --- contact_logs 溝通紀錄表 ---
+    # 注意：現在使用 vid（車輛ID）作為主要關聯，group_id 作為備用
     c.execute('''
         CREATE TABLE IF NOT EXISTS contact_logs (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_id        INTEGER NOT NULL,
+            vid             TEXT,
+            group_id        INTEGER,
             contacted_by    TEXT,
             contact_method  TEXT,
             content         TEXT,
             contacted_at    TEXT,
             created_at      TEXT,
             updated_at      TEXT,
+            FOREIGN KEY (vid) REFERENCES cars(vid),
             FOREIGN KEY (group_id) REFERENCES contact_groups(group_id)
         )
     ''')
@@ -296,6 +299,13 @@ def migrate_schema(conn):
         c.execute("ALTER TABLE contact_groups ADD COLUMN email TEXT DEFAULT ''")
         log.info("  新增 contact_groups.email 欄位")
 
+    # --- contact_logs 新增 vid 欄位（已存在的資料庫）---
+    try:
+        c.execute("SELECT vid FROM contact_logs LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE contact_logs ADD COLUMN vid TEXT DEFAULT NULL")
+        log.info("  新增 contact_logs.vid 欄位")
+
     # --- cars 新增 contact_group_id ---
     try:
         c.execute("SELECT contact_group_id FROM cars LIMIT 1")
@@ -312,6 +322,7 @@ def migrate_schema(conn):
         ('idx_cars_contact_group_id', 'cars(contact_group_id)'),
         ('idx_cg_classification', 'contact_groups(classification)'),
         ('idx_cg_phone', 'contact_groups(canonical_phone)'),
+        ('idx_cl_vid', 'contact_logs(vid)'),
         ('idx_cl_group', 'contact_logs(group_id)'),
         ('idx_cl_contacted_at', 'contact_logs(contacted_at)'),
         ('idx_crm_c_group', 'crm_contacts(group_id)'),
@@ -390,10 +401,26 @@ def extract_email_from_name(name):
     return name, ''
 
 
-def rebuild_contact_groups(conn):
-    """Union-Find 演算法重建聯絡人分組（僅同電話合併，不同名合併）"""
+def rebuild_contact_groups(conn, force=False):
+    """Union-Find 演算法重建聯絡人分組（僅同電話合併，不同名合併）
+
+    Args:
+        conn: 資料庫連線
+        force: 是否強制重建（忽略現有資料）
+
+    注意：為避免影響現有的 contact_logs 和手動調整過的群組，
+         只有在 contact_groups 表為空時才會執行重建。
+         若需強制重建，請設定 force=True（通常只在首次安裝時使用）。
+    """
     c = conn.cursor()
     now = datetime.now().isoformat()
+
+    # 檢查是否已有聯絡人分組資料
+    existing_count = c.execute('SELECT COUNT(*) FROM contact_groups').fetchone()[0]
+    if existing_count > 0 and not force:
+        log.info(f"聯絡人分組已存在 ({existing_count} 組)，跳過重建")
+        log.info("  提示：若需強制重建，請使用網頁介面的「重建聯絡人分組」功能")
+        return
 
     log.info("開始重建聯絡人分組...")
 

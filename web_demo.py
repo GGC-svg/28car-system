@@ -501,8 +501,69 @@ def api_car_detail(vid):
         (vid,)
     ).fetchall()
     car['photos'] = [dict(p) for p in photos]
+
+    # 取得該車輛的溝通紀錄（使用 vid 關聯）
+    logs = db.execute(
+        'SELECT * FROM contact_logs WHERE vid = ? ORDER BY contacted_at DESC',
+        (vid,)
+    ).fetchall()
+    car['contact_logs'] = [dict(l) for l in logs]
+
     db.close()
     return jsonify(car)
+
+
+@app.route('/api/car/<vid>/similar')
+@login_required
+def api_car_similar(vid):
+    """查詢同款車型（同 make + model）的車輛列表，用於價格參考"""
+    db = get_db()
+
+    # 取得當前車輛的 make 和 model
+    car = db.execute('SELECT make, model FROM cars WHERE vid = ?', (vid,)).fetchone()
+    if not car:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+
+    make = car['make']
+    model = car['model']
+
+    if not make or not model:
+        db.close()
+        return jsonify({'cars': [], 'message': '此車輛無品牌或型號資訊'})
+
+    # 排序參數
+    sort = request.args.get('sort', 'updated')  # updated, price_asc, price_desc, year_desc, year_asc
+
+    sort_map = {
+        'updated': 'c.updated_at DESC',
+        'price_asc': 'c.price_num ASC',
+        'price_desc': 'c.price_num DESC',
+        'year_desc': 'c.year DESC',
+        'year_asc': 'c.year ASC',
+    }
+    order_sql = sort_map.get(sort, 'c.updated_at DESC')
+
+    # 查詢同款車型，排除當前車輛
+    rows = db.execute(f'''
+        SELECT c.vid, c.car_no, c.make, c.model, c.year, c.price, c.price_num,
+               c.transmission, c.fuel, c.updated_at, c.is_sold, c.description,
+               (SELECT local_path FROM car_photos WHERE vid = c.vid AND downloaded = 1 ORDER BY photo_index LIMIT 1) as thumb
+        FROM cars c
+        WHERE c.make = ? AND c.model = ? AND c.vid != ?
+        ORDER BY {order_sql}
+        LIMIT 50
+    ''', (make, model, vid)).fetchall()
+
+    cars = [dict(r) for r in rows]
+    db.close()
+
+    return jsonify({
+        'make': make,
+        'model': model,
+        'total': len(cars),
+        'cars': cars
+    })
 
 
 # ============================================================
@@ -658,6 +719,7 @@ def api_contacts():
     contacted_by = request.args.get('contacted_by', '')
     update_days = request.args.get('update_days', '')
     price_changed = request.args.get('price_changed', '')
+    show_sold = request.args.get('show_sold', '0')  # 預設只顯示有在售車輛的聯絡人
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
 
@@ -697,36 +759,58 @@ def api_contacts():
     where_sql = ' AND '.join(where) if where else '1=1'
 
     sort_map = {
-        'car_count_desc': 'cg.car_count DESC',
-        'car_count_asc': 'cg.car_count ASC',
+        'car_count_desc': 'active_car_count DESC',
+        'car_count_asc': 'active_car_count ASC',
         'name_asc': 'cg.canonical_name ASC',
         'last_contact': 'last_contacted_at DESC',
         'log_count_desc': 'log_count DESC',
         'last_update': 'last_car_update DESC',
         'sms_count_desc': 'sms_count DESC',
     }
-    order_sql = sort_map.get(sort, 'cg.car_count DESC')
+    order_sql = sort_map.get(sort, 'active_car_count DESC')
+
+    # 透過 vid 關聯溝通紀錄（聯絡人的所有車輛的溝通紀錄）
+    # 根據 show_sold 參數動態計算車輛數
+    if show_sold == '0':
+        sold_filter = 'is_sold = 0'
+        count_filter = 'COALESCE(ac.active_car_count, 0) > 0'
+    elif show_sold == '1':
+        sold_filter = 'is_sold = 1'
+        count_filter = 'COALESCE(ac.active_car_count, 0) > 0'
+    else:
+        sold_filter = '1=1'  # 不過濾
+        count_filter = '1=1'  # 顯示全部
 
     base_query = f'''
         FROM contact_groups cg
         LEFT JOIN (
-            SELECT group_id,
+            SELECT contact_group_id,
+                   COUNT(*) as active_car_count
+            FROM cars WHERE {sold_filter} GROUP BY contact_group_id
+        ) ac ON cg.group_id = ac.contact_group_id
+        LEFT JOIN (
+            SELECT c.contact_group_id as group_id,
                    COUNT(*) as log_count,
-                   MAX(contacted_at) as last_contacted_at
-            FROM contact_logs GROUP BY group_id
+                   MAX(l.contacted_at) as last_contacted_at
+            FROM contact_logs l
+            JOIN cars c ON l.vid = c.vid
+            GROUP BY c.contact_group_id
         ) cl ON cg.group_id = cl.group_id
         LEFT JOIN (
-            SELECT l1.group_id, l1.contacted_by as last_contacted_by
+            SELECT c.contact_group_id as group_id, l1.contacted_by as last_contacted_by
             FROM contact_logs l1
+            JOIN cars c ON l1.vid = c.vid
             INNER JOIN (
-                SELECT group_id, MAX(contacted_at) as max_at
-                FROM contact_logs GROUP BY group_id
-            ) l2 ON l1.group_id = l2.group_id AND l1.contacted_at = l2.max_at
+                SELECT c2.contact_group_id, MAX(l2.contacted_at) as max_at
+                FROM contact_logs l2
+                JOIN cars c2 ON l2.vid = c2.vid
+                GROUP BY c2.contact_group_id
+            ) l2 ON c.contact_group_id = l2.contact_group_id AND l1.contacted_at = l2.max_at
         ) lcb ON cg.group_id = lcb.group_id
         LEFT JOIN (
             SELECT contact_group_id,
                    MAX(updated_at) as last_car_update
-            FROM cars GROUP BY contact_group_id
+            FROM cars WHERE {sold_filter} GROUP BY contact_group_id
         ) cu ON cg.group_id = cu.contact_group_id
         LEFT JOIN (
             SELECT group_id,
@@ -738,9 +822,9 @@ def api_contacts():
             SELECT contact_group_id,
                    COUNT(*) as price_changed_count,
                    MAX(price_changed_at) as last_price_change
-            FROM cars WHERE price_changed_at IS NOT NULL GROUP BY contact_group_id
+            FROM cars WHERE price_changed_at IS NOT NULL AND {sold_filter} GROUP BY contact_group_id
         ) pc ON cg.group_id = pc.contact_group_id
-        WHERE {where_sql}
+        WHERE {count_filter} AND {where_sql}
     '''
 
     count = db.execute(f'SELECT COUNT(*) {base_query}', params).fetchone()[0]
@@ -748,6 +832,7 @@ def api_contacts():
     offset = (page - 1) * per_page
     rows = db.execute(
         f'''SELECT cg.*,
+               COALESCE(ac.active_car_count, 0) as active_car_count,
                COALESCE(cl.log_count, 0) as log_count,
                cl.last_contacted_at,
                lcb.last_contacted_by,
@@ -966,37 +1051,102 @@ def api_contact_detail(group_id):
 
     result = dict(contact)
 
+    # 取得所有車輛（包含已售狀態）
     cars = db.execute(
-        'SELECT vid, car_no, make, model, year, price, price_num, source, updated_at FROM cars WHERE contact_group_id = ? ORDER BY first_seen DESC',
+        'SELECT vid, car_no, make, model, year, price, price_num, source, updated_at, is_sold FROM cars WHERE contact_group_id = ? ORDER BY is_sold ASC, first_seen DESC',
         (group_id,)
     ).fetchall()
     result['cars'] = [dict(c) for c in cars]
 
-    logs = db.execute(
-        'SELECT * FROM contact_logs WHERE group_id = ? ORDER BY contacted_at DESC',
-        (group_id,)
-    ).fetchall()
+    # 計算在售車輛數
+    result['active_car_count'] = sum(1 for c in result['cars'] if not c.get('is_sold'))
+
+    # 取得該聯絡人所有車輛的溝通紀錄（透過 vid 關聯）
+    vid_list = [c['vid'] for c in result['cars']]
+    if vid_list:
+        placeholders = ','.join(['?'] * len(vid_list))
+        logs = db.execute(
+            f'SELECT l.*, c.make, c.model FROM contact_logs l LEFT JOIN cars c ON l.vid = c.vid WHERE l.vid IN ({placeholders}) ORDER BY l.contacted_at DESC',
+            vid_list
+        ).fetchall()
+    else:
+        logs = []
     result['logs'] = [dict(l) for l in logs]
 
     db.close()
     return jsonify(result)
 
 
-@app.route('/api/contact/<int:group_id>/logs', methods=['POST'])
+@app.route('/api/car/<vid>/logs', methods=['POST'])
 @login_required
-def api_add_contact_log(group_id):
-    """新增溝通紀錄"""
+def api_add_car_contact_log(vid):
+    """新增溝通紀錄（透過車輛 vid）"""
     db = get_db()
     data = request.get_json()
     now = datetime.now().isoformat()
+
+    # 確認車輛存在並取得 group_id
+    car = db.execute('SELECT contact_group_id FROM cars WHERE vid = ?', (vid,)).fetchone()
+    if not car:
+        db.close()
+        return jsonify({'error': 'Car not found'}), 404
+
+    group_id = car['contact_group_id']
 
     # 誰聯絡的自動帶入登入帳號的顯示名稱
     contacted_by = request.current_user.get('display_name') or request.current_user.get('username')
 
     db.execute('''
-        INSERT INTO contact_logs (group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
+        vid,
+        group_id,
+        contacted_by,
+        data.get('contact_method', ''),
+        data.get('content', ''),
+        data.get('contacted_at', now),
+        now, now
+    ))
+
+    # 如果有設定意願狀態，同時更新 contact_groups
+    intention_status = data.get('intention_status', '')
+    if intention_status and group_id:
+        db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
+                   (intention_status, group_id))
+
+    # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
+    if intention_status == 'sold':
+        db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+        log.info(f"車輛 {vid} 已標記為已售（透過溝通紀錄）")
+
+    db.commit()
+    log_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+    db.close()
+    return jsonify({'status': 'ok', 'log_id': log_id})
+
+
+@app.route('/api/contact/<int:group_id>/logs', methods=['POST'])
+@login_required
+def api_add_contact_log(group_id):
+    """新增溝通紀錄（透過聯絡人 group_id，需指定 vid）"""
+    db = get_db()
+    data = request.get_json()
+    now = datetime.now().isoformat()
+
+    vid = data.get('vid')  # 必須提供 vid
+    if not vid:
+        db.close()
+        return jsonify({'error': 'vid is required'}), 400
+
+    # 誰聯絡的自動帶入登入帳號的顯示名稱
+    contacted_by = request.current_user.get('display_name') or request.current_user.get('username')
+
+    db.execute('''
+        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        vid,
         group_id,
         contacted_by,
         data.get('contact_method', ''),
@@ -1010,6 +1160,11 @@ def api_add_contact_log(group_id):
     if intention_status:
         db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
                    (intention_status, group_id))
+
+    # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
+    if intention_status == 'sold' and vid:
+        db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+        log.info(f"車輛 {vid} 已標記為已售（透過溝通紀錄）")
 
     db.commit()
     log_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
@@ -1048,6 +1203,14 @@ def api_update_contact_log(log_id):
         db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
                    (intention_status, group_id))
 
+    # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
+    if intention_status == 'sold':
+        # 從 contact_logs 取得 vid
+        log_row = db.execute('SELECT vid FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+        if log_row and log_row['vid']:
+            db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (log_row['vid'],))
+            log.info(f"車輛 {log_row['vid']} 已標記為已售（透過溝通紀錄更新）")
+
     db.commit()
     db.close()
     return jsonify({'status': 'ok'})
@@ -1065,14 +1228,19 @@ def api_delete_contact_log(log_id):
 
 
 @app.route('/api/contacts/rebuild', methods=['POST'])
-@login_required
+@admin_required
 def api_rebuild_contacts():
-    """手動觸發聯絡人分組重建"""
+    """手動觸發聯絡人分組重建（管理員專用）
+
+    注意：這會重新計算所有群組ID，現有的 contact_logs 若使用 group_id 關聯可能會失效。
+    建議所有 contact_logs 都改用 vid 關聯。
+    """
     from migrate_db import rebuild_contact_groups
     db = get_db()
     db.row_factory = None
-    rebuild_contact_groups(db)
+    rebuild_contact_groups(db, force=True)  # 強制重建
     db.close()
+    log_operation(request.current_user['id'], 'REBUILD_CONTACTS', None, None, {})
     return jsonify({'status': 'ok', 'message': '聯絡人分組已重建'})
 
 
@@ -2250,6 +2418,205 @@ def api_admin_do_update():
                 'message': '更新失敗',
                 'error': result.stderr
             })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================
+# 排程管理 API
+# ============================================================
+
+@app.route('/api/admin/schedules')
+@admin_required
+def api_admin_schedules():
+    """取得排程設定"""
+    import subprocess
+
+    schedules = {
+        'scraper': {'name': '28car_daily', 'time': None, 'enabled': False, 'description': '每日爬蟲',
+                    'last_run': None, 'last_status': None, 'last_result': None},
+        'backup': {'name': '28car_backup', 'time': None, 'enabled': False, 'description': '每日備份',
+                   'last_run': None, 'last_status': None, 'last_result': None}
+    }
+
+    try:
+        # 使用 schtasks 查詢排程
+        for key, info in schedules.items():
+            result = subprocess.run(
+                ['schtasks', '/query', '/tn', info['name'], '/fo', 'list', '/v'],
+                capture_output=True, text=True, encoding='cp950', errors='ignore'
+            )
+            if result.returncode == 0:
+                schedules[key]['enabled'] = True
+                # 解析開始時間
+                for line in result.stdout.split('\n'):
+                    if '開始時間' in line or 'Start Time' in line:
+                        parts = line.split(':', 1)
+                        if len(parts) > 1:
+                            time_str = parts[1].strip()
+                            # 嘗試提取 HH:MM 格式
+                            import re
+                            match = re.search(r'(\d{1,2}):(\d{2})', time_str)
+                            if match:
+                                schedules[key]['time'] = f"{int(match.group(1)):02d}:{match.group(2)}"
+    except Exception as e:
+        log.error(f"查詢排程失敗: {e}")
+
+    # 取得爬蟲最後執行資訊
+    try:
+        db = get_db()
+        last_run = db.execute(
+            '''SELECT started_at, finished_at, status, new_cars, updated_cars, unchanged_cars
+               FROM scraper_runs ORDER BY started_at DESC LIMIT 1'''
+        ).fetchone()
+        db.close()
+        if last_run:
+            schedules['scraper']['last_run'] = last_run['finished_at'] or last_run['started_at']
+            schedules['scraper']['last_status'] = last_run['status']
+            # status 可能是 'success', 'completed', 'running', 'failed' 等
+            if last_run['status'] in ('success', 'completed'):
+                schedules['scraper']['last_result'] = f"新增 {last_run['new_cars']} / 更新 {last_run['updated_cars']} / 無變動 {last_run['unchanged_cars']}"
+            elif last_run['status'] == 'running':
+                schedules['scraper']['last_result'] = '執行中...'
+            else:
+                schedules['scraper']['last_result'] = '執行失敗'
+    except Exception as e:
+        log.error(f"查詢爬蟲記錄失敗: {e}")
+
+    # 取得備份最後執行資訊
+    try:
+        backup_log_path = os.path.join(BASE_DIR, 'backup', 'backup.log')
+        if os.path.exists(backup_log_path):
+            with open(backup_log_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                if lines:
+                    last_line = lines[-1].strip()
+                    # 格式: [2026-02-11 05:00:00] 備份成功: ...
+                    import re
+                    match = re.match(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.+)', last_line)
+                    if match:
+                        schedules['backup']['last_run'] = match.group(1)
+                        result_text = match.group(2)
+                        if '成功' in result_text:
+                            schedules['backup']['last_status'] = 'completed'
+                            schedules['backup']['last_result'] = '備份成功'
+                        else:
+                            schedules['backup']['last_status'] = 'failed'
+                            schedules['backup']['last_result'] = result_text[:50]
+    except Exception as e:
+        log.error(f"讀取備份日誌失敗: {e}")
+
+    return jsonify(schedules)
+
+
+@app.route('/api/admin/schedules', methods=['PUT'])
+@admin_required
+def api_admin_update_schedule():
+    """修改排程時間"""
+    import subprocess
+
+    data = request.get_json()
+    schedule_type = data.get('type')  # 'scraper' or 'backup'
+    new_time = data.get('time')  # 'HH:MM' 格式
+
+    if schedule_type not in ('scraper', 'backup'):
+        return jsonify({'error': '無效的排程類型'}), 400
+
+    if not new_time or not re.match(r'^\d{2}:\d{2}$', new_time):
+        return jsonify({'error': '時間格式無效，請使用 HH:MM 格式'}), 400
+
+    task_name = '28car_daily' if schedule_type == 'scraper' else '28car_backup'
+    script_name = 'run_daily.bat' if schedule_type == 'scraper' else 'backup_db.bat'
+    script_path = os.path.join(BASE_DIR, script_name)
+
+    try:
+        # 刪除舊排程
+        subprocess.run(['schtasks', '/delete', '/tn', task_name, '/f'],
+                      capture_output=True, errors='ignore')
+
+        # 建立新排程
+        result = subprocess.run(
+            ['schtasks', '/create', '/tn', task_name, '/tr', script_path,
+             '/sc', 'daily', '/st', new_time, '/f'],
+            capture_output=True, text=True, encoding='cp950', errors='ignore'
+        )
+
+        if result.returncode == 0:
+            log_operation(request.current_user['id'], 'UPDATE_SCHEDULE',
+                         'schedule', task_name, {'new_time': new_time})
+            return jsonify({'success': True, 'message': f'排程已更新為 {new_time}'})
+        else:
+            return jsonify({'success': False, 'error': result.stderr or '設定失敗，可能需要管理員權限'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/admin/run-daily-scraper', methods=['POST'])
+@admin_required
+def api_admin_run_daily_scraper():
+    """立即執行每日爬蟲（Daily 模式，非完整爬蟲）"""
+    import subprocess
+    import threading
+
+    script_path = os.path.join(BASE_DIR, 'run_daily.bat')
+
+    if not os.path.exists(script_path):
+        return jsonify({'success': False, 'error': '找不到 run_daily.bat'})
+
+    def run_scraper():
+        try:
+            subprocess.run(script_path, cwd=BASE_DIR, shell=True)
+        except Exception as e:
+            log.error(f"執行爬蟲失敗: {e}")
+
+    # 在背景執行
+    thread = threading.Thread(target=run_scraper, daemon=True)
+    thread.start()
+
+    log_operation(request.current_user['id'], 'RUN_DAILY_SCRAPER', None, None, {})
+
+    return jsonify({
+        'success': True,
+        'message': '每日爬蟲已在背景執行中，請稍後查看資料更新'
+    })
+
+
+@app.route('/api/admin/run-backup', methods=['POST'])
+@admin_required
+def api_admin_run_backup():
+    """立即執行資料庫備份"""
+    import subprocess
+
+    script_path = os.path.join(BASE_DIR, 'backup_db.bat')
+
+    if not os.path.exists(script_path):
+        return jsonify({'success': False, 'error': '找不到 backup_db.bat'})
+
+    try:
+        result = subprocess.run(script_path, cwd=BASE_DIR, shell=True,
+                               capture_output=True, timeout=60)
+
+        log_operation(request.current_user['id'], 'RUN_BACKUP', None, None, {})
+
+        if result.returncode == 0:
+            # 讀取備份日誌的最後一行
+            log_path = os.path.join(BASE_DIR, 'backup', 'backup.log')
+            last_log = ''
+            if os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    if lines:
+                        last_log = lines[-1].strip()
+
+            return jsonify({
+                'success': True,
+                'message': '備份完成！',
+                'log': last_log
+            })
+        else:
+            return jsonify({'success': False, 'error': '備份執行失敗'})
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'error': '備份超時'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 

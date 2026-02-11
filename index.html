@@ -250,9 +250,19 @@ body {
   color: #c62828;
   border: 1px solid rgba(255,65,108,0.2);
 }
-.badge-private { 
-  background: #f3f4f6; 
+.badge-private {
+  background: #f3f4f6;
   color: #666;
+  border: 1px solid #e0e0e0;
+}
+.badge-green {
+  background: linear-gradient(135deg, rgba(76,175,80,0.15), rgba(67,160,71,0.15));
+  color: #2e7d32;
+  border: 1px solid rgba(76,175,80,0.3);
+}
+.badge-gray {
+  background: #f5f5f5;
+  color: #9e9e9e;
   border: 1px solid #e0e0e0;
 }
 
@@ -412,6 +422,17 @@ body {
 .detail-desc { background:#f8f9fa; border-radius:8px; padding:14px; margin-bottom:16px; line-height:1.8; font-size:14px; }
 .detail-contact { background:#e8f5e9; border-radius:8px; padding:14px; font-size:15px; margin-bottom:12px; }
 .detail-contact b { color:#2e7d32; }
+
+/* Similar Cars List */
+.similar-cars-list { display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto; }
+.similar-car-item { display:flex; gap:12px; padding:10px; background:#f8f9fa; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+.similar-car-item:hover { background:#e3f2fd; transform:translateX(4px); }
+.similar-car-thumb { width:80px; height:60px; object-fit:cover; border-radius:6px; background:#ddd; flex-shrink:0; }
+.similar-car-info { flex:1; min-width:0; }
+.similar-car-price { font-size:15px; font-weight:700; color:#1a73e8; margin-bottom:4px; }
+.similar-car-specs { font-size:12px; color:#666; display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+.similar-car-specs span { background:#e0e0e0; padding:2px 6px; border-radius:4px; }
+.similar-car-time { font-size:11px; color:#999; }
 
 /* Data Table - Premium */
 .data-table { 
@@ -986,6 +1007,26 @@ body.dark-mode .detail-contact {
 body.dark-mode .detail-contact b {
   color: #81C784 !important;
 }
+/* Dark mode - Similar Cars */
+body.dark-mode .similar-car-item {
+  background: #2a2a3e !important;
+}
+body.dark-mode .similar-car-item:hover {
+  background: rgba(102, 126, 234, 0.2) !important;
+}
+body.dark-mode .similar-car-price {
+  color: #64b5f6 !important;
+}
+body.dark-mode .similar-car-specs {
+  color: #aaa !important;
+}
+body.dark-mode .similar-car-specs span {
+  background: #444 !important;
+  color: #ccc !important;
+}
+body.dark-mode .similar-car-time {
+  color: #888 !important;
+}
 
 /* Dark mode - SMS Template items */
 body.dark-mode .template-item {
@@ -1001,6 +1042,98 @@ body.dark-mode .template-item b {
 }
 body.dark-mode .template-item .template-content {
   color: #aaa !important;
+}
+
+/* Dark mode - 管理後台 */
+body.dark-mode .admin-table th {
+  background: #2a2a3e;
+  color: #ccc;
+  border-bottom-color: #444;
+}
+body.dark-mode .admin-table td {
+  border-bottom-color: #333;
+  color: #ddd;
+}
+body.dark-mode .admin-table tr:hover {
+  background: rgba(102, 126, 234, 0.15) !important;
+}
+body.dark-mode .admin-table .role-badge.user {
+  background: #444;
+  color: #ccc;
+}
+body.dark-mode .admin-table .status-badge.active {
+  background: rgba(76, 175, 80, 0.25);
+  color: #81c784;
+}
+body.dark-mode .admin-table .status-badge.inactive {
+  background: rgba(244, 67, 54, 0.25);
+  color: #ef9a9a;
+}
+body.dark-mode .network-info-card {
+  background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4e 100%);
+}
+body.dark-mode .network-info-card h4 {
+  color: #e0e0e0;
+}
+body.dark-mode .info-row {
+  background: #2a2a3e;
+}
+body.dark-mode .info-label {
+  color: #aaa;
+}
+body.dark-mode .info-value {
+  color: #e0e0e0;
+}
+body.dark-mode div[style*="background:#fff3cd"] {
+  background: rgba(255, 193, 7, 0.15) !important;
+}
+body.dark-mode div[style*="background:#e3f2fd"] {
+  background: rgba(33, 150, 243, 0.15) !important;
+}
+body.dark-mode div[style*="background:#f9f9f9"] {
+  background: #1a1a2e !important;
+}
+/* Dark mode - 排程卡片 */
+body.dark-mode .schedule-card {
+  background: #1a1a2e !important;
+  border-color: #444 !important;
+}
+body.dark-mode .schedule-card h5 {
+  color: #e0e0e0;
+}
+body.dark-mode .schedule-card p {
+  color: #888 !important;
+}
+body.dark-mode .schedule-card label {
+  color: #ccc !important;
+}
+body.dark-mode .schedule-last-run {
+  color: #aaa !important;
+  border-top-color: #444 !important;
+}
+body.dark-mode input[type="date"],
+body.dark-mode input[type="datetime-local"] {
+  background: #2a2a3e;
+  color: #e0e0e0;
+  border-color: #444;
+}
+body.dark-mode input[type="date"]::-webkit-calendar-picker-indicator,
+body.dark-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+body.dark-mode .badge-green {
+  background: rgba(76, 175, 80, 0.25);
+  color: #81c784;
+  border-color: rgba(76, 175, 80, 0.4);
+}
+body.dark-mode .badge-gray {
+  background: #333;
+  color: #888;
+  border-color: #444;
+}
+body.dark-mode .action-badge {
+  background: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
 }
 
 /* ============================================================
@@ -1239,6 +1372,13 @@ body.dark-mode .template-item .template-content {
   padding: 4px 10px;
   font-size: 12px;
 }
+.action-badge {
+  padding: 2px 8px;
+  background: #e3f2fd;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1565c0;
+}
 .network-info-card {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 24px;
@@ -1385,6 +1525,11 @@ body.dark-mode .template-item .template-content {
 <div class="tab-content active" id="tabCars">
   <div class="filter-bar">
     <input type="text" id="searchInput" placeholder="搜尋品牌、型號...">
+    <select id="filterSold">
+      <option value="0" selected>在售車輛</option>
+      <option value="1">已售車輛</option>
+      <option value="">全部車輛</option>
+    </select>
     <select id="filterSource"><option value="">全部來源</option></select>
     <select id="filterCarType"><option value="">全部車類</option></select>
     <select id="filterMake"><option value="">全部車廠</option></select>
@@ -1442,6 +1587,11 @@ body.dark-mode .template-item .template-content {
 <div class="tab-content" id="tabContacts">
   <div class="filter-bar">
     <input type="text" id="contactSearch" placeholder="搜尋聯絡人...">
+    <select id="contactShowSold">
+      <option value="0" selected>在售車輛聯絡人</option>
+      <option value="1">已售車輛聯絡人</option>
+      <option value="">全部聯絡人</option>
+    </select>
     <select id="contactClass">
       <option value="">全部分類</option>
       <option value="dealer">車行 (5+輛)</option>
@@ -1994,9 +2144,10 @@ body.dark-mode .template-item .template-content {
       </h3>
       <button class="close-btn" onclick="closeModal('adminModal')">&times;</button>
     </div>
-    <div style="display:flex;gap:16px;margin:16px 0">
+    <div style="display:flex;gap:16px;margin:16px 0;flex-wrap:wrap">
       <button class="btn btn-sm" id="adminTabUsers" onclick="switchAdminTab('users')">使用者管理</button>
       <button class="btn btn-sm btn-outline" id="adminTabLogs" onclick="switchAdminTab('logs')">操作日誌</button>
+      <button class="btn btn-sm btn-outline" id="adminTabSchedules" onclick="switchAdminTab('schedules')">排程管理</button>
       <button class="btn btn-sm btn-outline" id="adminTabNetwork" onclick="switchAdminTab('network')">網路資訊</button>
     </div>
     <div class="modal-body" style="flex:1;overflow-y:auto">
@@ -2053,6 +2204,62 @@ body.dark-mode .template-item .template-content {
           <tbody id="logTableBody"></tbody>
         </table>
         <div id="logPagination" style="margin-top:16px;text-align:center"></div>
+      </div>
+      <!-- 排程管理 -->
+      <div id="adminPanelSchedules" style="display:none">
+        <div class="network-info-card">
+          <h4>⏰ 自動排程設定</h4>
+          <p style="color:#666;margin-bottom:20px">管理每日自動執行的任務排程</p>
+
+          <div id="schedulesLoading" style="text-align:center;padding:20px;color:#666">載入中...</div>
+
+          <div id="schedulesContent" style="display:none">
+            <!-- 每日備份 -->
+            <div class="schedule-card" style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                  <h5 style="margin:0;font-size:15px">📦 每日資料庫備份</h5>
+                  <p style="margin:4px 0 0;font-size:12px;color:#888">自動備份資料庫，防止資料遺失</p>
+                </div>
+                <span id="scheduleBackupStatus" class="badge"></span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <label style="font-size:13px">執行時間：</label>
+                <input type="time" id="backupTime" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px">
+                <button class="btn btn-sm" onclick="updateScheduleTime('backup')">儲存</button>
+                <button class="btn btn-sm btn-green" onclick="runBackupNow()">立即執行</button>
+              </div>
+              <div id="backupLastRun" class="schedule-last-run" style="font-size:12px;color:#666;padding-top:8px;border-top:1px dashed #ddd"></div>
+            </div>
+
+            <!-- 每日爬蟲 -->
+            <div class="schedule-card" style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                  <h5 style="margin:0;font-size:15px">🕷️ 每日爬蟲更新</h5>
+                  <p style="margin:4px 0 0;font-size:12px;color:#888">自動更新 28car 車輛資料（Daily 模式，非完整爬蟲）</p>
+                </div>
+                <span id="scheduleScraperStatus" class="badge"></span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <label style="font-size:13px">執行時間：</label>
+                <input type="time" id="scraperTime" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px">
+                <button class="btn btn-sm" onclick="updateScheduleTime('scraper')">儲存</button>
+                <button class="btn btn-sm btn-green" onclick="runScraperNow()">立即執行</button>
+              </div>
+              <div id="scraperLastRun" class="schedule-last-run" style="font-size:12px;color:#666;padding-top:8px;border-top:1px dashed #ddd"></div>
+            </div>
+
+            <div style="padding:16px;background:#e3f2fd;border-radius:8px">
+              <strong>💡 建議設定</strong>
+              <ul style="margin:10px 0 0 20px;color:#666;font-size:13px">
+                <li>建議備份時間設在爬蟲之前（如：備份 05:00，爬蟲 06:00）</li>
+                <li>爬蟲會在背景執行，執行時間視資料量而定（約 10-30 分鐘）</li>
+                <li>修改排程需要系統管理員權限</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- 網路資訊 -->
       <div id="adminPanelNetwork" style="display:none">
@@ -2282,6 +2489,7 @@ function resetFilters() {
     if (el.tagName === 'INPUT') el.value = ''; else el.selectedIndex = 0;
   });
   document.getElementById('filterSort').value = 'newest';
+  document.getElementById('filterSold').value = '0';  // 預設顯示在售車輛
   loadCars(1);
 }
 
@@ -2296,6 +2504,7 @@ async function loadCars(page) {
     page,
     per_page: 24,
     q: document.getElementById('searchInput').value,
+    sold: document.getElementById('filterSold').value,
     source: document.getElementById('filterSource').value,
     car_type: document.getElementById('filterCarType').value,
     make: document.getElementById('filterMake').value,
@@ -2378,8 +2587,57 @@ async function openDetail(vid) {
     const car = await r.json();
     document.getElementById('carModalTitle').textContent = `${car.make} ${car.model}`;
     document.getElementById('carModalBody').innerHTML = renderDetail(car);
+
+    // 載入同款車型查價列表
+    loadSimilarCars(vid, car.make, car.model);
   } catch(e) {
     document.getElementById('carModalBody').innerHTML = '<div class="empty">載入失敗</div>';
+  }
+}
+
+async function loadSimilarCars(vid, make, model) {
+  const container = document.getElementById('similarCarsContainer');
+  if (!container) return;
+
+  const sortSelect = document.getElementById('similarSort');
+  const sort = sortSelect ? sortSelect.value : 'updated';
+
+  try {
+    const r = await fetch(`/api/car/${vid}/similar?sort=${sort}`);
+    const data = await r.json();
+
+    if (!data.cars || data.cars.length === 0) {
+      container.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 0">沒有找到同款車型</div>';
+      return;
+    }
+
+    let html = `<div style="font-size:12px;color:#666;margin-bottom:10px">找到 ${data.total} 筆同款車型 (${esc(make)} ${esc(model)})</div>`;
+    html += '<div class="similar-cars-list">';
+
+    for (const c of data.cars) {
+      const thumb = c.thumb ? `/${c.thumb}` : '/static/no-image.png';
+      const soldBadge = c.is_sold ? '<span class="badge" style="background:#9e9e9e;color:#fff;font-size:10px">已售</span>' : '';
+      const updateTime = formatUpdatedAt(c.updated_at);
+
+      html += `<div class="similar-car-item" onclick="closeModal('carModal');openDetail('${c.vid}')">
+        <img class="similar-car-thumb" src="${thumb}" onerror="this.src='/static/no-image.png'">
+        <div class="similar-car-info">
+          <div class="similar-car-price">${esc(c.price || '價格洽詢')} ${soldBadge}</div>
+          <div class="similar-car-specs">
+            ${c.year ? `<span>${esc(c.year)}年</span>` : ''}
+            ${c.transmission ? `<span>${esc(c.transmission)}</span>` : ''}
+            ${c.fuel ? `<span>${esc(c.fuel)}</span>` : ''}
+          </div>
+          <div class="similar-car-time">${updateTime}</div>
+        </div>
+      </div>`;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div style="color:#e74c3c;font-size:13px">載入失敗</div>';
+    console.error('loadSimilarCars:', e);
   }
 }
 
@@ -2454,7 +2712,151 @@ function renderDetail(car) {
        </div>`
     : '';
 
-  return badgesHtml + gallery + `<div class="detail-specs">${specsHtml}</div>` + desc + contact + source;
+  // 車輛溝通紀錄區
+  const logs = car.contact_logs || [];
+  let logsHtml = `<div style="margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="font-size:15px;margin:0">溝通紀錄 (${logs.length})</h3>
+      <button class="btn btn-sm btn-green" onclick="showCarAddLogForm('${car.vid}')">+ 新增紀錄</button>
+    </div>
+    <div id="carAddLogFormArea"></div>
+    <div id="carLogsList">`;
+
+  if (logs.length > 0) {
+    logsHtml += logs.map(log => renderCarLogEntry(log)).join('');
+  } else {
+    logsHtml += '<div style="color:#aaa;font-size:13px;padding:8px 0">尚無溝通紀錄</div>';
+  }
+  logsHtml += '</div></div>';
+
+  // 同款車型查價區
+  const similarHtml = `<div style="margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="font-size:15px;margin:0">同款車型查價</h3>
+      <select id="similarSort" onchange="loadSimilarCars('${car.vid}', '${esc(car.make)}', '${esc(car.model)}')" style="padding:4px 8px;font-size:12px;border:1px solid #ddd;border-radius:4px">
+        <option value="updated">更新時間</option>
+        <option value="price_asc">價格低→高</option>
+        <option value="price_desc">價格高→低</option>
+        <option value="year_desc">年份新→舊</option>
+        <option value="year_asc">年份舊→新</option>
+      </select>
+    </div>
+    <div id="similarCarsContainer"><div class="loading" style="font-size:13px">載入中...</div></div>
+  </div>`;
+
+  return badgesHtml + gallery + `<div class="detail-specs">${specsHtml}</div>` + desc + contact + source + logsHtml + similarHtml;
+}
+
+// 車輛詳情頁的溝通紀錄渲染
+function renderCarLogEntry(log) {
+  const method = log.contact_method || 'other';
+  const mClass = 'm-' + method;
+  const mLabel = methodLabels[method] || method;
+  const contactedAt = log.contacted_at ? log.contacted_at.replace('T', ' ').substring(0, 16) : '';
+
+  return `<div class="log-entry" id="carLogEntry_${log.id}" style="border:1px solid #e0e0e0;border-radius:6px;padding:10px;margin-bottom:8px;background:#fafafa">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="log-meta" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span><b>${esc(contactedAt)}</b></span>
+        <span class="method-tag ${mClass}">${mLabel}</span>
+        ${log.contacted_by ? `<span>聯絡人：<b>${esc(log.contacted_by)}</b></span>` : ''}
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm" style="font-size:11px;padding:2px 8px" onclick="deleteCarLog(${log.id}, '${log.vid}')">刪除</button>
+      </div>
+    </div>
+    ${log.content ? `<div class="log-content" style="margin-top:8px;color:#555;font-size:13px">${esc(log.content)}</div>` : ''}
+  </div>`;
+}
+
+// 暫存當前車輛 vid
+let currentCarVid = null;
+
+function showCarAddLogForm(vid) {
+  currentCarVid = vid;
+  const area = document.getElementById('carAddLogFormArea');
+  if (area.innerHTML) { area.innerHTML = ''; return; }
+  const now = new Date().toISOString().substring(0, 16);
+  const methodOpts = methodOptions.map(m => `<option value="${m}">${methodLabels[m]}</option>`).join('');
+  const intentionOpts = [
+    { value: '', label: '-- 未設定 --' },
+    { value: 'willing', label: '有意願' },
+    { value: 'unwilling', label: '無意願' },
+    { value: 'tracking', label: '待追蹤' },
+    { value: 'sold', label: '車輛已售' }
+  ].map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  area.innerHTML = `<div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="form-group" style="margin:0">
+        <label>聯絡時間</label>
+        <input type="datetime-local" id="carLogAt_new" value="${now}">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>溝通方式</label>
+        <select id="carLogMethod_new">${methodOpts}</select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>意願狀態 <span style="font-size:10px;color:#e65100">選「車輛已售」會自動下架</span></label>
+        <select id="carLogIntention_new">${intentionOpts}</select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>誰聯絡的 <span style="font-size:11px;color:#888">(自動帶入登入帳號)</span></label>
+      <input type="text" value="${esc(currentUser ? (currentUser.display_name || currentUser.username) : '')}" readonly style="background:#f5f5f5;cursor:not-allowed">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>溝通內容</label>
+      <textarea id="carLogContent_new" style="height:70px" placeholder="記錄溝通內容..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" onclick="saveCarNewLog('${vid}')">儲存</button>
+      <button class="btn btn-sm btn-outline" onclick="cancelCarAddLog()">取消</button>
+    </div>
+  </div>`;
+}
+
+function cancelCarAddLog() {
+  document.getElementById('carAddLogFormArea').innerHTML = '';
+}
+
+async function saveCarNewLog(vid) {
+  const intentionStatus = document.getElementById('carLogIntention_new').value;
+
+  // 如果選擇「車輛已售」，彈出確認
+  if (intentionStatus === 'sold') {
+    if (!confirm('選擇「車輛已售」將會把此車輛標記為已售，不再顯示於車輛列表中。\n\n確定要繼續嗎？')) {
+      return;
+    }
+  }
+
+  const data = {
+    contact_method: document.getElementById('carLogMethod_new').value,
+    content: document.getElementById('carLogContent_new').value,
+    contacted_at: document.getElementById('carLogAt_new').value,
+    intention_status: intentionStatus,
+  };
+  try {
+    await fetch(`/api/car/${vid}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (intentionStatus === 'sold') {
+      alert('車輛已標記為已售');
+      closeModal('carModal');
+      loadCars(1);  // 重新載入車輛列表
+    } else {
+      openDetail(vid);  // 重新載入車輛詳情
+    }
+  } catch(e) { alert('新增失敗: ' + e.message); }
+}
+
+async function deleteCarLog(logId, vid) {
+  if (!confirm('確定要刪除這筆溝通紀錄？')) return;
+  try {
+    await fetch(`/api/contact/log/${logId}`, { method: 'DELETE' });
+    openDetail(vid);  // 重新載入車輛詳情
+  } catch(e) { alert('刪除失敗: ' + e.message); }
 }
 
 function switchPhoto(thumb, src) {
@@ -2490,6 +2892,7 @@ async function loadContacts(page) {
     page,
     per_page: 50,
     q: document.getElementById('contactSearch').value,
+    show_sold: document.getElementById('contactShowSold').value,
     classification: document.getElementById('contactClass').value,
     intention: document.getElementById('contactIntention').value,
     has_logs: document.getElementById('contactHasLogs').value,
@@ -2545,7 +2948,7 @@ async function loadContacts(page) {
         <td onclick="openContactDetail(${c.group_id})">${intentionLabel ? `<span style="color:${intentionColor};font-weight:600;font-size:12px">${intentionLabel}</span>` : '<span style="color:#ccc">-</span>'}</td>
         <td onclick="openContactDetail(${c.group_id})"><b>${esc(c.canonical_name)}</b></td>
         <td onclick="openContactDetail(${c.group_id})">${esc(c.canonical_phone)}</td>
-        <td onclick="openContactDetail(${c.group_id})">${c.car_count}/${c.active_car_count}</td>
+        <td onclick="openContactDetail(${c.group_id})">${c.active_car_count || 0}</td>
         <td onclick="openContactDetail(${c.group_id})" style="font-size:12px;color:#888">${lastUpdate}</td>
         <td onclick="openContactDetail(${c.group_id})">${smsCount > 0 ? `<span style="color:#4CAF50;font-weight:600">${smsCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
         <td onclick="openContactDetail(${c.group_id})">${logCount > 0 ? `<span style="color:#1a73e8;font-weight:600">${logCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
@@ -2666,6 +3069,7 @@ async function submitBatchClassification() {
 
 function resetContactFilters() {
   document.getElementById('contactSearch').value = '';
+  document.getElementById('contactShowSold').value = '0';  // 預設顯示在售車輛聯絡人
   document.getElementById('contactClass').value = 'private';
   document.getElementById('contactIntention').value = '';
   document.getElementById('contactHasLogs').value = '';
@@ -2712,6 +3116,7 @@ async function openContactDetail(groupId) {
   try {
     const r = await fetch(`/api/contact/${groupId}`);
     const data = await r.json();
+    currentContactDetailCache = data;  // 快取聯絡人詳情供新增溝通紀錄使用
     document.getElementById('contactModalTitle').textContent = data.canonical_name || '聯絡人詳情';
 
     const cls = data.classification;
@@ -2785,12 +3190,15 @@ function renderLogEntry(log, intentionStatus) {
   const mClass = 'm-' + method;
   const mLabel = methodLabels[method] || method;
   const contactedAt = log.contacted_at ? log.contacted_at.replace('T', ' ').substring(0, 16) : '';
-  
+
   const intentionLabels = { willing: '有意願', unwilling: '無意願', tracking: '待追蹤', sold: '車輛已售' };
   const intentionColors = { willing: '#4CAF50', unwilling: '#f44336', tracking: '#ff9800', sold: '#9e9e9e' };
   const iLabel = intentionLabels[intentionStatus] || '';
   const iColor = intentionColors[intentionStatus] || '#ccc';
-  
+
+  // 顯示關聯車輛資訊（如果有）
+  const carInfo = (log.make || log.model) ? `${log.make || ''} ${log.model || ''}`.trim() : '';
+
   return `<div class="log-entry" id="logEntry_${log.id}">
     <div class="log-actions">
       <button onclick="showEditLogForm(${log.id}, ${log.group_id})">編輯</button>
@@ -2799,6 +3207,7 @@ function renderLogEntry(log, intentionStatus) {
     <div class="log-meta">
       <span><b>${esc(contactedAt)}</b></span>
       <span class="method-tag ${mClass}">${mLabel}</span>
+      ${carInfo ? `<span style="color:#1976d2;font-size:12px">🚗 ${esc(carInfo)}</span>` : ''}
       ${iLabel ? `<span style="color:${iColor};font-weight:600">${iLabel}</span>` : ''}
       ${log.contacted_by ? `<span>聯絡人：<b>${esc(log.contacted_by)}</b></span>` : ''}
     </div>
@@ -2807,7 +3216,7 @@ function renderLogEntry(log, intentionStatus) {
 }
 
 function renderLogForm(opts) {
-  const { id, groupId, contacted_by, contact_method, content, contacted_at, intention_status, isEdit } = opts;
+  const { id, groupId, contacted_by, contact_method, content, contacted_at, intention_status, isEdit, cars, selectedVid } = opts;
   const now = new Date();
   const defaultAt = contacted_at || now.toISOString().substring(0, 16);
   const methodOpts = methodOptions.map(m =>
@@ -2822,8 +3231,21 @@ function renderLogForm(opts) {
     { value: 'sold', label: '車輛已售' }
   ].map(o => `<option value="${o.value}" ${intention_status === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
 
+  // 車輛選擇（新增時必選）
+  let carSelectHtml = '';
+  if (!isEdit && cars && cars.length > 0) {
+    const carOpts = cars.map(c =>
+      `<option value="${c.vid}" ${selectedVid === c.vid ? 'selected' : ''}>${c.make} ${c.model} (${c.year || '-'}) - ${c.car_no}</option>`
+    ).join('');
+    carSelectHtml = `<div class="form-group" style="margin:0">
+      <label>關聯車輛 <span style="color:#f00">*</span></label>
+      <select id="logVid_${id}">${carOpts}</select>
+    </div>`;
+  }
+
   return `<div class="log-form" style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:${carSelectHtml ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr'};gap:10px;margin-bottom:10px">
+      ${carSelectHtml}
       <div class="form-group" style="margin:0">
         <label>聯絡時間</label>
         <input type="datetime-local" id="logAt_${id}" value="${esc(defaultAt)}">
@@ -2852,10 +3274,25 @@ function renderLogForm(opts) {
   </div>`;
 }
 
+// 暫存聯絡人詳情（用於新增溝通紀錄）
+let currentContactDetailCache = null;
+
 function showAddLogForm(groupId) {
   const area = document.getElementById('addLogFormArea');
   if (area.innerHTML) { area.innerHTML = ''; return; }
-  area.innerHTML = renderLogForm({ id: 'new', groupId, contacted_by: (currentUser ? (currentUser.display_name || currentUser.username) : ''), contact_method: 'phone', content: '', contacted_at: '', intention_status: '', isEdit: false });
+  const cars = currentContactDetailCache?.cars || [];
+  if (cars.length === 0) {
+    alert('此聯絡人無名下車輛，無法新增溝通紀錄');
+    return;
+  }
+  area.innerHTML = renderLogForm({
+    id: 'new', groupId,
+    contacted_by: (currentUser ? (currentUser.display_name || currentUser.username) : ''),
+    contact_method: 'phone', content: '', contacted_at: '', intention_status: '',
+    isEdit: false,
+    cars: cars,
+    selectedVid: cars[0]?.vid
+  });
 }
 
 function cancelAddLog() {
@@ -2863,7 +3300,14 @@ function cancelAddLog() {
 }
 
 async function saveNewLog(groupId) {
+  const vidSelect = document.getElementById('logVid_new');
+  const vid = vidSelect ? vidSelect.value : null;
+  if (!vid) {
+    alert('請選擇關聯車輛');
+    return;
+  }
   const data = {
+    vid: vid,  // 關聯車輛 ID
     // contacted_by 由後端自動帶入登入帳號
     contact_method: document.getElementById('logMethod_new').value,
     content: document.getElementById('logContent_new').value,
@@ -3940,13 +4384,14 @@ function openAdminPanel() {
 }
 
 function switchAdminTab(tab) {
-  ['users', 'logs', 'network'].forEach(t => {
+  ['users', 'logs', 'schedules', 'network'].forEach(t => {
     document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
     document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('btn-outline', t !== tab);
     document.getElementById('adminPanel' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'users') loadAdminUsers();
   if (tab === 'logs') loadAdminLogs(1);
+  if (tab === 'schedules') loadSchedules();
   if (tab === 'network') loadNetworkInfo();
 }
 
@@ -4133,7 +4578,7 @@ async function loadAdminLogs(page) {
       <tr>
         <td style="font-size:12px">${l.created_at ? l.created_at.substring(0, 16).replace('T', ' ') : '-'}</td>
         <td>${esc(l.username || '-')}</td>
-        <td><span style="padding:2px 6px;background:#e3f2fd;border-radius:4px;font-size:12px">${esc(l.action)}</span></td>
+        <td><span class="action-badge">${esc(l.action)}</span></td>
         <td style="font-size:12px">${l.target_type ? `${esc(l.target_type)}:${esc(l.target_id || '')}` : '-'}</td>
         <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${l.details ? esc(l.details).substring(0, 50) : '-'}</td>
         <td style="font-size:12px;color:#888">${esc(l.ip_address || '-')}</td>
@@ -4178,6 +4623,230 @@ function copyNetworkURL() {
   });
 }
 
+// 檢查更新
+async function checkForUpdate() {
+  // 顯示進度彈窗
+  const overlay = document.createElement('div');
+  overlay.id = 'updateOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;justify-content:center;align-items:center';
+
+  const isDark = document.body.classList.contains('dark-mode');
+  const bgColor = isDark ? '#1e1e2e' : 'white';
+  const cardBg = isDark ? '#2a2a3e' : '#f5f5f5';
+
+  overlay.innerHTML = `
+    <div style="background:${bgColor};padding:24px;border-radius:12px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+      <h3 style="margin:0 0 16px;display:flex;align-items:center;gap:8px">
+        <span id="updateIcon">🔄</span> <span id="updateTitle">檢查更新中...</span>
+      </h3>
+      <div id="updateStatus" style="padding:12px;background:${cardBg};border-radius:8px;margin-bottom:16px;font-size:14px">
+        正在連接伺服器...
+      </div>
+      <div id="updateDetails" style="display:none;margin-bottom:16px"></div>
+      <div id="updateActions" style="display:none;text-align:right">
+        <button class="btn btn-sm btn-outline" onclick="closeUpdateOverlay()">關閉</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  try {
+    // 檢查更新
+    document.getElementById('updateStatus').textContent = '正在檢查遠端版本...';
+
+    const checkRes = await fetch('/api/admin/check-update');
+    const checkData = await checkRes.json();
+
+    if (checkData.error) {
+      showUpdateResult('error', '檢查失敗', checkData.error);
+      return;
+    }
+
+    if (!checkData.has_update) {
+      showUpdateResult('success', '已是最新版本',
+        `目前版本: ${checkData.local_version || '未知'}<br>遠端版本: ${checkData.remote_version || '未知'}`);
+      return;
+    }
+
+    // 有更新可用
+    let detailsHtml = `<div style="font-size:13px">
+      <p><b>目前版本:</b> ${checkData.local_version || '未知'}</p>
+      <p><b>最新版本:</b> ${checkData.remote_version || '未知'}</p>`;
+
+    if (checkData.commits && checkData.commits.length > 0) {
+      detailsHtml += '<p style="margin-top:12px"><b>更新內容:</b></p><ul style="margin:8px 0 0 20px;padding:0">';
+      checkData.commits.forEach(c => {
+        detailsHtml += `<li style="margin-bottom:4px">${esc(c)}</li>`;
+      });
+      detailsHtml += '</ul>';
+    }
+    detailsHtml += '</div>';
+
+    document.getElementById('updateIcon').textContent = '📦';
+    document.getElementById('updateTitle').textContent = '發現新版本！';
+    document.getElementById('updateStatus').innerHTML = '有新版本可用，是否要更新？';
+    document.getElementById('updateDetails').innerHTML = detailsHtml;
+    document.getElementById('updateDetails').style.display = 'block';
+    document.getElementById('updateActions').innerHTML = `
+      <button class="btn btn-sm btn-outline" onclick="closeUpdateOverlay()" style="margin-right:8px">稍後再說</button>
+      <button class="btn btn-sm btn-green" onclick="doUpdate()">立即更新</button>
+    `;
+    document.getElementById('updateActions').style.display = 'block';
+
+  } catch (e) {
+    showUpdateResult('error', '檢查失敗', e.message);
+  }
+}
+
+async function doUpdate() {
+  document.getElementById('updateIcon').textContent = '⏳';
+  document.getElementById('updateTitle').textContent = '更新中...';
+  document.getElementById('updateStatus').textContent = '正在下載更新，請稍候...';
+  document.getElementById('updateDetails').style.display = 'none';
+  document.getElementById('updateActions').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/admin/do-update', { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      showUpdateResult('success', '更新完成！',
+        '程式已更新，請重新啟動伺服器以套用更新。<br><br>' +
+        '<small style="color:#888">如有資料庫結構更新，請執行 migrate_db.py</small>');
+    } else {
+      showUpdateResult('error', '更新失敗', data.error || data.message || '未知錯誤');
+    }
+  } catch (e) {
+    showUpdateResult('error', '更新失敗', e.message);
+  }
+}
+
+function showUpdateResult(type, title, message) {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  document.getElementById('updateIcon').textContent = icons[type] || 'ℹ️';
+  document.getElementById('updateTitle').textContent = title;
+  document.getElementById('updateStatus').innerHTML = message;
+  document.getElementById('updateActions').innerHTML = '<button class="btn btn-sm" onclick="closeUpdateOverlay()">確定</button>';
+  document.getElementById('updateActions').style.display = 'block';
+}
+
+function closeUpdateOverlay() {
+  const overlay = document.getElementById('updateOverlay');
+  if (overlay) overlay.remove();
+}
+
+// 排程管理
+async function loadSchedules() {
+  document.getElementById('schedulesLoading').style.display = 'block';
+  document.getElementById('schedulesContent').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/admin/schedules');
+    const data = await r.json();
+
+    // 備份排程
+    if (data.backup) {
+      document.getElementById('backupTime').value = data.backup.time || '05:00';
+      document.getElementById('scheduleBackupStatus').textContent = data.backup.enabled ? '已啟用' : '未啟用';
+      document.getElementById('scheduleBackupStatus').className = 'badge ' + (data.backup.enabled ? 'badge-green' : 'badge-gray');
+
+      // 最後執行資訊
+      const backupLastRun = document.getElementById('backupLastRun');
+      if (data.backup.last_run) {
+        const statusIcon = data.backup.last_status === 'completed' ? '✅' : '❌';
+        backupLastRun.innerHTML = `<strong>最後執行：</strong>${data.backup.last_run} ${statusIcon} ${data.backup.last_result || ''}`;
+      } else {
+        backupLastRun.innerHTML = '<strong>最後執行：</strong>尚無執行記錄';
+      }
+    }
+
+    // 爬蟲排程
+    if (data.scraper) {
+      document.getElementById('scraperTime').value = data.scraper.time || '06:00';
+      document.getElementById('scheduleScraperStatus').textContent = data.scraper.enabled ? '已啟用' : '未啟用';
+      document.getElementById('scheduleScraperStatus').className = 'badge ' + (data.scraper.enabled ? 'badge-green' : 'badge-gray');
+
+      // 最後執行資訊
+      const scraperLastRun = document.getElementById('scraperLastRun');
+      if (data.scraper.last_run) {
+        let statusIcon = '⏳';
+        if (data.scraper.last_status === 'completed') statusIcon = '✅';
+        else if (data.scraper.last_status === 'failed') statusIcon = '❌';
+        scraperLastRun.innerHTML = `<strong>最後執行：</strong>${data.scraper.last_run} ${statusIcon} ${data.scraper.last_result || ''}`;
+      } else {
+        scraperLastRun.innerHTML = '<strong>最後執行：</strong>尚無執行記錄';
+      }
+    }
+
+    document.getElementById('schedulesLoading').style.display = 'none';
+    document.getElementById('schedulesContent').style.display = 'block';
+  } catch(e) {
+    document.getElementById('schedulesLoading').textContent = '載入失敗: ' + e.message;
+    console.error('loadSchedules:', e);
+  }
+}
+
+async function updateScheduleTime(type) {
+  const timeInput = type === 'backup' ? document.getElementById('backupTime') : document.getElementById('scraperTime');
+  const time = timeInput.value;
+
+  if (!time) {
+    alert('請選擇時間');
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/admin/schedules', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, time })
+    });
+    const data = await r.json();
+
+    if (data.success) {
+      alert(data.message);
+      loadSchedules();
+    } else {
+      alert('設定失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) {
+    alert('設定失敗: ' + e.message);
+  }
+}
+
+async function runBackupNow() {
+  if (!confirm('確定要立即執行資料庫備份？')) return;
+
+  try {
+    const r = await fetch('/api/admin/run-backup', { method: 'POST' });
+    const data = await r.json();
+
+    if (data.success) {
+      alert('備份完成！\n\n' + (data.log || ''));
+    } else {
+      alert('備份失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) {
+    alert('執行失敗: ' + e.message);
+  }
+}
+
+async function runScraperNow() {
+  if (!confirm('確定要立即執行每日爬蟲？\n\n（這是 Daily 模式，只會更新最近資料，不是完整爬蟲）')) return;
+
+  try {
+    const r = await fetch('/api/admin/run-daily-scraper', { method: 'POST' });
+    const data = await r.json();
+
+    if (data.success) {
+      alert(data.message);
+    } else {
+      alert('執行失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) {
+    alert('執行失敗: ' + e.message);
+  }
+}
 
 
 // Go
