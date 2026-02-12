@@ -1812,7 +1812,7 @@ body.dark-mode .action-badge {
               <span>至</span>
               <input type="time" id="smsSendWindowEnd" value="11:00" style="padding:8px;border:1px solid #ddd;border-radius:4px">
             </div>
-            <div style="font-size:11px;color:#888;margin-top:4px">排程任務會在此時間區間內發送簡訊</div>
+            <div style="font-size:11px;color:#888;margin-top:4px">系統會在此時間區間內自動發送簡訊</div>
           </div>
           <div id="smsConfigButtons">
           <button class="btn" onclick="saveSmsConfig()">儲存設定</button>
@@ -2250,6 +2250,24 @@ body.dark-mode .action-badge {
               <div id="scraperLastRun" class="schedule-last-run" style="font-size:12px;color:#666;padding-top:8px;border-top:1px dashed #ddd"></div>
             </div>
 
+            <!-- 每日簡訊 -->
+            <div class="schedule-card" style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                  <h5 style="margin:0;font-size:15px">📱 每日簡訊發送</h5>
+                  <p style="margin:4px 0 0;font-size:12px;color:#888">在設定的時間區間內自動發送簡訊</p>
+                </div>
+                <span id="scheduleSmsStatus" class="badge"></span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <label style="font-size:13px">排程時間：</label>
+                <span id="smsScheduleTime" style="padding:6px 10px;background:#fff;border:1px solid #ddd;border-radius:4px">10:00</span>
+                <span style="font-size:12px;color:#888">（實際發送依簡訊設定的時間區間）</span>
+                <button class="btn btn-sm btn-green" onclick="runSmsNow()">立即執行</button>
+              </div>
+              <div id="smsLastRun" class="schedule-last-run" style="font-size:12px;color:#666;padding-top:8px;border-top:1px dashed #ddd"></div>
+            </div>
+
             <div style="padding:16px;background:#e3f2fd;border-radius:8px">
               <strong>💡 建議設定</strong>
               <ul style="margin:10px 0 0 20px;color:#666;font-size:13px">
@@ -2257,6 +2275,18 @@ body.dark-mode .action-badge {
                 <li>爬蟲會在背景執行，執行時間視資料量而定（約 10-30 分鐘）</li>
                 <li>修改排程需要系統管理員權限</li>
               </ul>
+            </div>
+
+            <!-- 每日任務執行日誌 -->
+            <div class="schedule-card" style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-top:16px;background:#f9f9f9">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h5 style="margin:0;font-size:15px">📋 每日任務執行日誌</h5>
+                <button class="btn btn-sm btn-outline" onclick="loadSchedules()">重新整理</button>
+              </div>
+              <div id="dailyTaskLog" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:4px;font-family:monospace;font-size:12px;max-height:200px;overflow-y:auto;white-space:pre-wrap">
+                尚無執行記錄
+              </div>
+              <p style="margin:8px 0 0;font-size:11px;color:#888">日誌檔案位置：daily_task.log（自動保留最近 1000 行）</p>
             </div>
           </div>
         </div>
@@ -2356,6 +2386,15 @@ const sourceLabels = { sell: '私人', cmy: '車行' };
 const statusLabels = { new: '新增', contacted: '已聯繫', replied: '已回覆', not_interested: '無意願' };
 const classLabels = { dealer: '車行', broker: '同行', private: '私人' };
 let crmSelectedIds = new Set();
+
+// ============================================================
+// Helper Functions
+// ============================================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 // ============================================================
 // Init
@@ -4770,12 +4809,47 @@ async function loadSchedules() {
       const scraperLastRun = document.getElementById('scraperLastRun');
       if (data.scraper.last_run) {
         let statusIcon = '⏳';
-        if (data.scraper.last_status === 'completed') statusIcon = '✅';
+        if (data.scraper.last_status === 'completed' || data.scraper.last_status === 'success') statusIcon = '✅';
         else if (data.scraper.last_status === 'failed') statusIcon = '❌';
         scraperLastRun.innerHTML = `<strong>最後執行：</strong>${data.scraper.last_run} ${statusIcon} ${data.scraper.last_result || ''}`;
       } else {
         scraperLastRun.innerHTML = '<strong>最後執行：</strong>尚無執行記錄';
       }
+    }
+
+    // 簡訊排程
+    if (data.sms) {
+      document.getElementById('smsScheduleTime').textContent = data.sms.time || '10:00';
+      document.getElementById('scheduleSmsStatus').textContent = data.sms.enabled ? '已啟用' : '未啟用';
+      document.getElementById('scheduleSmsStatus').className = 'badge ' + (data.sms.enabled ? 'badge-green' : 'badge-gray');
+
+      // 最後執行資訊
+      const smsLastRun = document.getElementById('smsLastRun');
+      if (data.sms.last_run) {
+        let statusIcon = '⏳';
+        if (data.sms.last_status === 'completed') statusIcon = '✅';
+        else if (data.sms.last_status === 'error' || data.sms.last_status === 'failed') statusIcon = '❌';
+        smsLastRun.innerHTML = `<strong>最後執行：</strong>${data.sms.last_run} ${statusIcon} ${data.sms.last_result || ''}`;
+      } else {
+        smsLastRun.innerHTML = '<strong>最後執行：</strong>尚無執行記錄';
+      }
+    }
+
+    // 每日任務執行日誌
+    const dailyLogEl = document.getElementById('dailyTaskLog');
+    if (data.daily_log && data.daily_log.length > 0) {
+      // 顏色標記
+      const coloredLog = data.daily_log.map(line => {
+        if (line.includes('成功')) return `<span style="color:#4caf50">${escapeHtml(line)}</span>`;
+        if (line.includes('失敗') || line.includes('錯誤')) return `<span style="color:#f44336">${escapeHtml(line)}</span>`;
+        if (line.includes('開始')) return `<span style="color:#2196f3">${escapeHtml(line)}</span>`;
+        if (line.includes('===')) return `<span style="color:#888">${escapeHtml(line)}</span>`;
+        return escapeHtml(line);
+      }).join('\n');
+      dailyLogEl.innerHTML = coloredLog;
+      dailyLogEl.scrollTop = dailyLogEl.scrollHeight;
+    } else {
+      dailyLogEl.textContent = '尚無執行記錄（首次執行後會在此顯示）';
     }
 
     document.getElementById('schedulesLoading').style.display = 'none';
@@ -4839,7 +4913,34 @@ async function runScraperNow() {
     const data = await r.json();
 
     if (data.success) {
-      alert(data.message);
+      alert('✅ 爬蟲已在背景啟動！\n\n' +
+            '📋 查看執行狀態：\n' +
+            '• 下方「每日任務執行日誌」會顯示進度\n' +
+            '• 「最後執行」時間會在完成後更新\n\n' +
+            '⏱️ 預計執行時間：10-60 分鐘（視資料量）');
+      // 2秒後自動刷新顯示
+      setTimeout(() => loadSchedules(), 2000);
+    } else {
+      alert('執行失敗: ' + (data.error || '未知錯誤'));
+    }
+  } catch(e) {
+    alert('執行失敗: ' + e.message);
+  }
+}
+
+async function runSmsNow() {
+  if (!confirm('確定要立即執行簡訊發送？\n\n（會強制執行，忽略時間區間設定）')) return;
+
+  try {
+    const r = await fetch('/api/admin/run-sms', { method: 'POST' });
+    const data = await r.json();
+
+    if (data.success) {
+      alert('✅ 簡訊任務已在背景啟動！\n\n' +
+            '📋 查看執行狀態：\n' +
+            '• 「最後執行」會顯示發送結果\n' +
+            '• 簡訊系統頁面可查看詳細記錄');
+      setTimeout(() => loadSchedules(), 2000);
     } else {
       alert('執行失敗: ' + (data.error || '未知錯誤'));
     }

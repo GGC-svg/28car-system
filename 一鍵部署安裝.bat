@@ -3,9 +3,38 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 title 28Car 一鍵部署安裝
 
+:: ============================================
+:: 檢查並請求管理員權限
+:: ============================================
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+if '%errorlevel%' NEQ '0' (
+    echo.
+    echo ============================================
+    echo   需要管理員權限才能完成安裝
+    echo   正在請求權限...
+    echo ============================================
+    echo.
+    goto :UAC_Prompt
+) else (
+    goto :Got_Admin
+)
+
+:UAC_Prompt
+echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+"%temp%\getadmin.vbs"
+del "%temp%\getadmin.vbs"
+exit /b
+
+:Got_Admin
+pushd "%CD%"
+cd /d "%~dp0"
+
 echo ============================================
 echo    28Car 車輛管理系統 - 一鍵部署安裝
 echo ============================================
+echo.
+echo [OK] 已取得管理員權限
 echo.
 
 :: 取得目前腳本所在目錄
@@ -39,27 +68,20 @@ echo ============================================
 echo  步驟 1/6: 建立桌面捷徑
 echo ============================================
 
-set "DESKTOP=%USERPROFILE%\Desktop"
-set "VBS_FILE=%TEMP%\create_shortcut.vbs"
+:: 使用 PowerShell 建立桌面捷徑（避免中文編碼問題）
+powershell -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut(\"$desktop\28Car Server.lnk\"); $sc.TargetPath = '%SCRIPT_DIR%\28car_server.exe'; $sc.WorkingDirectory = '%SCRIPT_DIR%'; $sc.Save()"
+if %errorlevel%==0 (
+    echo [OK] 建立捷徑: 28Car Server（啟動伺服器）
+) else (
+    echo [!] 建立捷徑失敗
+)
 
-:: 建立「啟動伺服器」桌面捷徑
-echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
-echo sLinkFile = "%DESKTOP%\28Car 車輛管理.lnk" >> "%VBS_FILE%"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
-echo oLink.TargetPath = "%SCRIPT_DIR%\28car_server.exe" >> "%VBS_FILE%"
-echo oLink.WorkingDirectory = "%SCRIPT_DIR%" >> "%VBS_FILE%"
-echo oLink.Description = "28Car 車輛管理系統" >> "%VBS_FILE%"
-echo oLink.Save >> "%VBS_FILE%"
-cscript //nologo "%VBS_FILE%"
-
-:: 建立「開啟網頁」桌面捷徑
-echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
-echo sLinkFile = "%DESKTOP%\28Car 開啟網頁.lnk" >> "%VBS_FILE%"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
-echo oLink.TargetPath = "http://localhost:5000" >> "%VBS_FILE%"
-echo oLink.Description = "開啟 28Car 網頁介面" >> "%VBS_FILE%"
-echo oLink.Save >> "%VBS_FILE%"
-cscript //nologo "%VBS_FILE%"
+powershell -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut(\"$desktop\28Car Web.lnk\"); $sc.TargetPath = 'http://localhost:5000'; $sc.Save()"
+if %errorlevel%==0 (
+    echo [OK] 建立捷徑: 28Car Web（開啟網頁）
+) else (
+    echo [!] 建立捷徑失敗
+)
 
 del "%VBS_FILE%"
 echo [OK] 桌面捷徑已建立
@@ -70,21 +92,14 @@ echo  步驟 2/6: 設定開機自動啟動
 echo ============================================
 
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "SHORTCUT_NAME=28Car伺服器.lnk"
 
-:: 建立啟動資料夾捷徑
-echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
-echo sLinkFile = "%STARTUP_FOLDER%\%SHORTCUT_NAME%" >> "%VBS_FILE%"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
-echo oLink.TargetPath = "%SCRIPT_DIR%\28car_server.exe" >> "%VBS_FILE%"
-echo oLink.WorkingDirectory = "%SCRIPT_DIR%" >> "%VBS_FILE%"
-echo oLink.Description = "28Car 車輛管理系統" >> "%VBS_FILE%"
-echo oLink.WindowStyle = 7 >> "%VBS_FILE%"
-echo oLink.Save >> "%VBS_FILE%"
-cscript //nologo "%VBS_FILE%"
-del "%VBS_FILE%"
-
-echo [OK] 開機自動啟動已設定
+:: 使用 PowerShell 建立啟動資料夾捷徑（避免中文編碼問題）
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%STARTUP_FOLDER%\28Car Server.lnk'); $sc.TargetPath = '%SCRIPT_DIR%\28car_server.exe'; $sc.WorkingDirectory = '%SCRIPT_DIR%'; $sc.WindowStyle = 7; $sc.Save()"
+if %errorlevel%==0 (
+    echo [OK] 開機自動啟動已設定
+) else (
+    echo [!] 開機自動啟動設定失敗
+)
 
 echo.
 echo ============================================
@@ -95,7 +110,12 @@ echo ============================================
 schtasks /delete /tn "28car_daily" /f >nul 2>&1
 
 :: 建立新排程（每天早上 6:00 執行）
-schtasks /create /tn "28car_daily" /tr "%SCRIPT_DIR%\run_daily.bat" /sc daily /st 06:00 /f >nul 2>&1
+:: 使用 run_daily_exe.bat 給 exe 版本，run_daily.bat 給開發版本
+if exist "%SCRIPT_DIR%\28car_scraper.exe" (
+    schtasks /create /tn "28car_daily" /tr "%SCRIPT_DIR%\run_daily_exe.bat" /sc daily /st 06:00 /f >nul 2>&1
+) else (
+    schtasks /create /tn "28car_daily" /tr "%SCRIPT_DIR%\run_daily.bat" /sc daily /st 06:00 /f >nul 2>&1
+)
 if %errorlevel%==0 (
     echo [OK] 每日排程已設定（每天早上 06:00 自動執行爬蟲）
 ) else (
@@ -163,14 +183,43 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
 
 echo.
 echo ============================================
+echo  驗證排程設定
+echo ============================================
+
+:: 驗證排程任務是否建立成功
+set "DAILY_OK=0"
+set "BACKUP_OK=0"
+
+schtasks /query /tn "28car_daily" >nul 2>&1
+if %errorlevel%==0 (
+    set "DAILY_OK=1"
+    echo [OK] 每日爬蟲排程：已建立
+) else (
+    echo [!!] 每日爬蟲排程：建立失敗
+)
+
+schtasks /query /tn "28car_backup" >nul 2>&1
+if %errorlevel%==0 (
+    set "BACKUP_OK=1"
+    echo [OK] 每日備份排程：已建立
+) else (
+    echo [!!] 每日備份排程：建立失敗
+)
+
+echo.
+echo ============================================
 echo  安裝完成！
 echo ============================================
 echo.
 echo  桌面已新增:
-echo    - 28Car 車輛管理（啟動伺服器）
-echo    - 28Car 開啟網頁（瀏覽器開啟）
+echo    - 28Car Server（啟動伺服器）
+echo    - 28Car Web（開啟網頁）
 echo.
-echo  自動化設定:
+if "!DAILY_OK!"=="1" if "!BACKUP_OK!"=="1" (
+    echo  [OK] 自動化設定（全部成功）:
+) else (
+    echo  [!] 自動化設定（部分失敗，請檢查上方訊息）:
+)
 echo    - 開機時伺服器會自動啟動
 echo    - 每天 05:00 自動備份資料庫（保留於 backup 資料夾）
 echo    - 每天 06:00 自動執行爬蟲更新資料

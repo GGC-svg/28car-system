@@ -1015,20 +1015,55 @@ class Scraper28Car:
         return new_count, updated_count, unchanged_count
 
     def _mark_stale_cars(self, conn, stale_days):
-        """標記超過 N 天沒出現在列表的車輛為可能已下架"""
+        """標記超過 N 天沒出現在列表的車輛為已下架（驗證詳情頁後才標記）"""
         c = conn.cursor()
+
+        # 1. 先查詢可能要標記的車輛
         c.execute('''
-            UPDATE cars SET is_sold = 1
+            SELECT vid, source FROM cars
             WHERE is_sold = 0
               AND last_seen < datetime('now', ? || ' days')
         ''', (f'-{stale_days}',))
-        count = c.rowcount
-        conn.commit()
-        if count > 0:
-            log.info(f"  已標記 {count} 輛車為可能下架（超過 {stale_days} 天未出現）")
-        else:
+
+        candidates = c.fetchall()
+
+        if not candidates:
             log.info(f"  無需標記下架車輛")
-        return count
+            return 0
+
+        log.info(f"  發現 {len(candidates)} 輛車超過 {stale_days} 天未出現，開始驗證詳情頁...")
+
+        marked_count = 0
+        still_active = 0
+        now = datetime.now().isoformat()
+
+        for vid, source in candidates:
+            # 2. 驗證詳情頁是否還存在
+            try:
+                self._delay(0.5, 1.0)  # 短暫延遲避免被封
+                url = self._detail_url(source, vid)
+                text = self._fetch(url)
+
+                # 檢查是否有「已售」或頁面內容表示已下架
+                if '已售' in text or '此車輛已下架' in text or '找不到此車輛' in text:
+                    c.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+                    marked_count += 1
+                    log.info(f"    [已售] vid={vid}")
+                else:
+                    # 車輛還在，更新 last_seen
+                    c.execute('UPDATE cars SET last_seen = ? WHERE vid = ?', (now, vid))
+                    still_active += 1
+                    log.info(f"    [仍在] vid={vid}，更新 last_seen")
+
+            except Exception as e:
+                # 頁面不存在或抓取失敗，標記為已售
+                c.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+                marked_count += 1
+                log.info(f"    [下架] vid={vid} (頁面無法存取: {e})")
+
+        conn.commit()
+        log.info(f"  驗證完成: {marked_count} 輛已下架, {still_active} 輛仍在售")
+        return marked_count
 
     # ============================================================
     # 完整爬取流程
@@ -1519,8 +1554,8 @@ def main():
                         help='只做 JSON 匯出（不爬取）')
     parser.add_argument('--daily', action='store_true',
                         help='每日智能更新模式（只掃描有變化的頁面）')
-    parser.add_argument('--stale-days', type=int, default=7,
-                        help='超過幾天沒出現標記為下架 (預設=7)')
+    parser.add_argument('--stale-days', type=int, default=14,
+                        help='超過幾天沒出現標記為下架 (預設=14)')
     parser.add_argument('--source', type=str, default='all',
                         choices=['sell', 'cmy', 'all'],
                         help='爬取來源: sell=私人, cmy=車行, all=全部 (預設=all)')

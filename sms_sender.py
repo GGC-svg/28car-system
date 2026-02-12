@@ -262,8 +262,23 @@ class OneWaySMS:
 # 每日發送任務
 # ============================================================
 
-def run_daily_send():
-    """執行每日自動發送"""
+def is_within_send_window(settings):
+    """檢查當前時間是否在發送時間區間內"""
+    now = datetime.now()
+    current_time = now.strftime('%H:%M')
+
+    start_time = settings.get('send_window_start', '10:00')
+    end_time = settings.get('send_window_end', '11:00')
+
+    return start_time <= current_time <= end_time
+
+
+def run_daily_send(force=False):
+    """執行每日自動發送
+
+    Args:
+        force: 如果為 True，則忽略時間區間檢查（用於手動觸發）
+    """
     log.info("=" * 60)
     log.info("  每日簡訊發送任務")
     log.info("=" * 60)
@@ -281,6 +296,14 @@ def run_daily_send():
     if not sms_config.get('enabled', False):
         log.warning("簡訊功能未啟用 (enabled=false)")
         return
+
+    # 檢查時間區間（除非是強制執行）
+    if not force:
+        if not is_within_send_window(settings):
+            start_time = settings.get('send_window_start', '10:00')
+            end_time = settings.get('send_window_end', '11:00')
+            log.info(f"目前時間不在發送區間 ({start_time} - {end_time})，跳過")
+            return
 
     # 檢查 API 憑證
     if not sms_config.get('api_username') or not sms_config.get('api_password'):
@@ -459,14 +482,15 @@ def check_balance():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='OneWaySMS 簡訊發送工具')
-    parser.add_argument('--daily', action='store_true', help='執行每日自動發送')
+    parser.add_argument('--daily', action='store_true', help='執行每日自動發送（會檢查時間區間）')
+    parser.add_argument('--force', action='store_true', help='強制執行（忽略時間區間檢查）')
     parser.add_argument('--test', type=str, metavar='PHONE', help='測試發送到指定電話')
     parser.add_argument('--balance', action='store_true', help='查詢餘額')
 
     args = parser.parse_args()
 
     if args.daily:
-        run_daily_send()
+        run_daily_send(force=args.force)
     elif args.test:
         test_send(args.test)
     elif args.balance:

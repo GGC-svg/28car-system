@@ -2436,7 +2436,9 @@ def api_admin_schedules():
         'scraper': {'name': '28car_daily', 'time': None, 'enabled': False, 'description': '每日爬蟲',
                     'last_run': None, 'last_status': None, 'last_result': None},
         'backup': {'name': '28car_backup', 'time': None, 'enabled': False, 'description': '每日備份',
-                   'last_run': None, 'last_status': None, 'last_result': None}
+                   'last_run': None, 'last_status': None, 'last_result': None},
+        'sms': {'name': '28car_sms', 'time': None, 'enabled': False, 'description': '每日簡訊',
+                'last_run': None, 'last_status': None, 'last_result': None}
     }
 
     try:
@@ -2483,6 +2485,17 @@ def api_admin_schedules():
     except Exception as e:
         log.error(f"查詢爬蟲記錄失敗: {e}")
 
+    # 讀取 daily_task.log 的最近執行紀錄
+    schedules['daily_log'] = []
+    try:
+        daily_log_path = os.path.join(BASE_DIR, 'daily_task.log')
+        if os.path.exists(daily_log_path):
+            with open(daily_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[-30:]  # 最近 30 行
+                schedules['daily_log'] = [line.strip() for line in lines if line.strip()]
+    except Exception as e:
+        log.error(f"讀取每日任務日誌失敗: {e}")
+
     # 取得備份最後執行資訊
     try:
         backup_log_path = os.path.join(BASE_DIR, 'backup', 'backup.log')
@@ -2505,6 +2518,28 @@ def api_admin_schedules():
                             schedules['backup']['last_result'] = result_text[:50]
     except Exception as e:
         log.error(f"讀取備份日誌失敗: {e}")
+
+    # 取得簡訊最後執行資訊
+    try:
+        db = get_db()
+        last_sms = db.execute(
+            '''SELECT run_date, started_at, finished_at, status, total_targets, sent_count, success_count, failed_count
+               FROM sms_daily_runs ORDER BY started_at DESC LIMIT 1'''
+        ).fetchone()
+        db.close()
+        if last_sms:
+            schedules['sms']['last_run'] = last_sms['finished_at'] or last_sms['started_at']
+            schedules['sms']['last_status'] = last_sms['status']
+            if last_sms['status'] == 'completed':
+                schedules['sms']['last_result'] = f"發送 {last_sms['sent_count']} / 成功 {last_sms['success_count']} / 失敗 {last_sms['failed_count']}"
+            elif last_sms['status'] == 'running':
+                schedules['sms']['last_result'] = '執行中...'
+            elif last_sms['status'] == 'error':
+                schedules['sms']['last_result'] = '執行失敗'
+            else:
+                schedules['sms']['last_result'] = last_sms['status']
+    except Exception as e:
+        log.error(f"查詢簡訊記錄失敗: {e}")
 
     return jsonify(schedules)
 
@@ -2557,16 +2592,47 @@ def api_admin_run_daily_scraper():
     """立即執行每日爬蟲（Daily 模式，非完整爬蟲）"""
     import subprocess
     import threading
+    import sys
+    from datetime import datetime
 
-    script_path = os.path.join(BASE_DIR, 'run_daily.bat')
+    # 優先使用 Python 直接執行，避免 bat 檔的編碼問題
+    scraper_path = os.path.join(BASE_DIR, 'scraper_28car.py')
+    daily_log_path = os.path.join(BASE_DIR, 'daily_task.log')
 
-    if not os.path.exists(script_path):
-        return jsonify({'success': False, 'error': '找不到 run_daily.bat'})
+    if not os.path.exists(scraper_path):
+        return jsonify({'success': False, 'error': '找不到 scraper_28car.py'})
+
+    def write_log(msg):
+        """寫入每日任務日誌"""
+        try:
+            with open(daily_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+        except:
+            pass
 
     def run_scraper():
         try:
-            subprocess.run(script_path, cwd=BASE_DIR, shell=True)
+            write_log("============================================")
+            write_log("手動觸發每日爬蟲")
+            write_log("開始執行爬蟲...")
+
+            # 直接用 Python 執行爬蟲
+            result = subprocess.run(
+                [sys.executable, scraper_path, '--daily', '--stale-days', '14'],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                write_log("爬蟲執行成功")
+            else:
+                write_log(f"爬蟲執行失敗，錯誤碼: {result.returncode}")
+
+            write_log("每日任務執行完畢")
+            write_log("============================================")
         except Exception as e:
+            write_log(f"執行爬蟲失敗: {e}")
             log.error(f"執行爬蟲失敗: {e}")
 
     # 在背景執行
@@ -2586,14 +2652,16 @@ def api_admin_run_daily_scraper():
 def api_admin_run_backup():
     """立即執行資料庫備份"""
     import subprocess
+    import sys
 
-    script_path = os.path.join(BASE_DIR, 'backup_db.bat')
+    # 優先使用 Python 版本
+    script_path = os.path.join(BASE_DIR, 'backup_db.py')
 
     if not os.path.exists(script_path):
-        return jsonify({'success': False, 'error': '找不到 backup_db.bat'})
+        return jsonify({'success': False, 'error': '找不到 backup_db.py'})
 
     try:
-        result = subprocess.run(script_path, cwd=BASE_DIR, shell=True,
+        result = subprocess.run([sys.executable, script_path], cwd=BASE_DIR,
                                capture_output=True, timeout=60)
 
         log_operation(request.current_user['id'], 'RUN_BACKUP', None, None, {})
@@ -2619,6 +2687,40 @@ def api_admin_run_backup():
         return jsonify({'success': False, 'error': '備份超時'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/admin/run-sms', methods=['POST'])
+@admin_required
+def api_admin_run_sms():
+    """立即執行簡訊發送（強制執行，忽略時間區間）"""
+    import subprocess
+    import sys
+    import threading
+
+    sms_script = os.path.join(BASE_DIR, 'sms_sender.py')
+
+    if not os.path.exists(sms_script):
+        return jsonify({'success': False, 'error': '找不到 sms_sender.py'})
+
+    def run_sms():
+        try:
+            subprocess.run(
+                [sys.executable, sms_script, '--daily', '--force'],
+                cwd=BASE_DIR
+            )
+        except Exception as e:
+            log.error(f"執行簡訊發送失敗: {e}")
+
+    # 在背景執行
+    thread = threading.Thread(target=run_sms, daemon=True)
+    thread.start()
+
+    log_operation(request.current_user['id'], 'RUN_SMS', None, None, {})
+
+    return jsonify({
+        'success': True,
+        'message': '簡訊發送已在背景執行中'
+    })
 
 
 # ============================================================
