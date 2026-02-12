@@ -2615,12 +2615,12 @@ async function loadSimilarCars(vid, make, model) {
     html += '<div class="similar-cars-list">';
 
     for (const c of data.cars) {
-      const thumb = c.thumb ? `/${c.thumb}` : '/static/no-image.png';
+      const thumb = c.thumb ? `/${c.thumb}` : '/static/no-image.svg';
       const soldBadge = c.is_sold ? '<span class="badge" style="background:#9e9e9e;color:#fff;font-size:10px">已售</span>' : '';
       const updateTime = formatUpdatedAt(c.updated_at);
 
       html += `<div class="similar-car-item" onclick="closeModal('carModal');openDetail('${c.vid}')">
-        <img class="similar-car-thumb" src="${thumb}" onerror="this.src='/static/no-image.png'">
+        <img class="similar-car-thumb" src="${thumb}" onerror="this.src='/static/no-image.svg'">
         <div class="similar-car-info">
           <div class="similar-car-price">${esc(c.price || '價格洽詢')} ${soldBadge}</div>
           <div class="similar-car-specs">
