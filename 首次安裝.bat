@@ -48,7 +48,8 @@ echo   來源: %REPO_URL%
 echo   目標: %INSTALL_DIR%
 echo.
 
-git clone "%REPO_URL%" "%INSTALL_DIR%"
+:: 使用淺克隆，只下載最新版本（不下載歷史，節省空間）
+git clone --depth 1 "%REPO_URL%" "%INSTALL_DIR%"
 
 if errorlevel 1 (
     echo.

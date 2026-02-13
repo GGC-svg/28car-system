@@ -10,7 +10,7 @@
 
 #define MyAppName "28Car 車輛管理系統"
 #define MyAppVersion "1.4"
-#define MyAppPublisher "28Car"
+#define MyAppPublisher "Car2"
 #define MyAppURL "http://localhost:5000"
 #define MyAppExeName "28car_server.exe"
 
@@ -47,8 +47,7 @@ UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"
+; 使用英文介面（中文語言檔需另外安裝）
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
@@ -58,19 +57,22 @@ Name: "schedule"; Description: "設定每日排程任務"; GroupDescription: "�
 Name: "firewall"; Description: "設定防火牆規則 (允許區域網路連線)"; GroupDescription: "其他選項:"; Flags: checkedonce
 
 [Files]
-; 主程式
+; 主程式 EXE
 Source: "28car_server.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "web_demo.py"; DestDir: "{app}"; Flags: ignoreversion
+Source: "28car_scraper.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "28car_sms.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "28car_backup.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; 網頁介面
 Source: "index.html"; DestDir: "{app}"; Flags: ignoreversion
 
-; 爬蟲和簡訊
+; Python 腳本 (備用)
+Source: "web_demo.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "scraper_28car.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sms_sender.py"; DestDir: "{app}"; Flags: ignoreversion
-Source: "sms_config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
-
-; 每日任務腳本
 Source: "backup_db.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "run_daily.py"; DestDir: "{app}"; Flags: ignoreversion
+Source: "sms_config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
 ; 安裝和工具
 Source: "setup.py"; DestDir: "{app}"; Flags: ignoreversion
@@ -83,19 +85,28 @@ Source: "啟動伺服器.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "檢查伺服器狀態.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "解除安裝.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "設定開機自動啟動.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "檢查更新.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 ; 說明文件
 Source: "使用說明.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "部署說明.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "打包說明.txt"; DestDir: "{app}"; Flags: ignoreversion
+
+; 靜態資源
+Source: "static\*"; DestDir: "{app}\static"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; 資料庫 (重要! 不覆蓋已存在的)
 Source: "cars_28car.db"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
-; 建立空的 images 資料夾和 backup 資料夾
-Source: ""; DestDir: "{app}\images"; Flags: ignoreversion createallsubdirs recursesubdirs skipifsourcedoesntexist
-Source: ""; DestDir: "{app}\backup"; Flags: ignoreversion createallsubdirs recursesubdirs skipifsourcedoesntexist
+; Git 版控 (用於遠端更新功能)
+Source: ".git\*"; DestDir: "{app}\.git"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ".gitignore"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+
+; MinGit (用於遠端更新功能)
+Source: "MinGit\*"; DestDir: "{app}\MinGit"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
+; 建立空的 images 資料夾和 backup 資料夾
 Name: "{app}\images"
 Name: "{app}\backup"
 
@@ -106,26 +117,26 @@ Name: "{group}\開啟網頁"; Filename: "http://localhost:5000"
 Name: "{group}\使用說明"; Filename: "{app}\使用說明.txt"
 Name: "{group}\解除安裝"; Filename: "{uninstallexe}"
 
-; 桌面捷徑
+; 桌面捷徑 (exe 內建殺舊進程邏輯)
 Name: "{commondesktop}\28Car Server"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{commondesktop}\28Car Web"; Filename: "http://localhost:5000"; Tasks: desktopicon
 
 [Run]
 ; 安裝完成後執行的動作
-; 設定開機自動啟動
-Filename: "cmd.exe"; Parameters: "/c copy ""{app}\{#MyAppExeName}"" ""{userstartup}\28Car Server.lnk"""; Flags: runhidden; Tasks: autostart
+; 設定開機自動啟動 (使用 PowerShell 建立捷徑到啟動資料夾)
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{userstartup}\28Car Server.lnk'); $s.TargetPath = '{app}\{#MyAppExeName}'; $s.WorkingDirectory = '{app}'; $s.Save()"""; Flags: runhidden; Tasks: autostart
 
 ; 設定防火牆
 Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""28Car Server"" dir=in action=allow protocol=tcp localport=5000"; Flags: runhidden; Tasks: firewall
 
-; 設定排程任務 (備份)
-Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_backup"" /tr ""{app}\backup_db.py"" /sc daily /st 05:00 /f"; Flags: runhidden; Tasks: schedule
+; 設定排程任務 (備份) - 使用 exe - 半夜 00:00
+Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_backup"" /tr ""\""""{app}\28car_backup.exe\"""" /sc daily /st 00:00 /f"; Flags: runhidden; Tasks: schedule
 
-; 設定排程任務 (爬蟲)
-Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_daily"" /tr ""python \""{app}\scraper_28car.py\"" --daily --stale-days 14"" /sc daily /st 06:00 /f"; Flags: runhidden; Tasks: schedule
+; 設定排程任務 (爬蟲) - 使用 exe - 凌晨 01:00
+Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_daily"" /tr ""\""""{app}\28car_scraper.exe\"" --daily --stale-days 14"" /sc daily /st 01:00 /f"; Flags: runhidden; Tasks: schedule
 
-; 設定排程任務 (簡訊)
-Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_sms"" /tr ""python \""{app}\sms_sender.py\"" --daily"" /sc daily /st 10:00 /f"; Flags: runhidden; Tasks: schedule
+; 設定排程任務 (簡訊) - 使用 exe - 上午 10:00
+Filename: "schtasks.exe"; Parameters: "/create /tn ""28car_sms"" /tr ""\""""{app}\28car_sms.exe\"" --daily"" /sc daily /st 10:00 /f"; Flags: runhidden; Tasks: schedule
 
 ; 啟動伺服器 (安裝完成後)
 Filename: "{app}\{#MyAppExeName}"; Description: "立即啟動 28Car 伺服器"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
@@ -149,9 +160,9 @@ Type: dirifempty; Name: "{app}\__pycache__"
 
 [Messages]
 WelcomeLabel1=歡迎使用 28Car 車輛管理系統
-WelcomeLabel2=此程式將安裝 {#MyAppName} v{#MyAppVersion} 到您的電腦。%n%n建議在安裝前關閉所有其他應用程式。%n%n注意：圖片資料夾需另外解壓縮到安裝目錄。
+WelcomeLabel2=此程式將安裝 {#MyAppName} v{#MyAppVersion} 到您的電腦。%n%n建議在安裝前關閉所有其他應用程式。%n%n注意：%n1. 圖片資料夾需另外解壓縮到安裝目錄%n2. 如需使用「檢查更新」功能，請先安裝 Git
 FinishedHeadingLabel=安裝完成
-FinishedLabel=28Car 車輛管理系統已成功安裝。%n%n預設帳號：admin%n預設密碼：admin%n（首次登入需更改密碼）%n%n如有圖片資料，請解壓縮到：%n{app}\images\
+FinishedLabel=28Car 車輛管理系統已成功安裝。%n%n預設帳號：admin%n預設密碼：admin%n（首次登入需更改密碼）%n%n後續步驟：%n1. 解壓縮圖片到：{app}\images\%n2. 安裝 Git（如需更新功能）：https://git-scm.com
 
 [Code]
 // 安裝前檢查

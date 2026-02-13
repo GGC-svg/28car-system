@@ -55,17 +55,16 @@ echo.
 echo 即將執行以下設定:
 echo   [1] 建立桌面捷徑
 echo   [2] 設定開機自動啟動
-echo   [3] 設定每日爬蟲排程
-echo   [4] 設定每日資料庫備份
-echo   [5] 設定防火牆（允許區域網路連線）
-echo   [6] 啟動伺服器
+echo   [3] 設定每日排程（備份 00:00、爬蟲 01:00、簡訊 10:00）
+echo   [4] 設定防火牆（允許區域網路連線）
+echo   [5] 啟動伺服器
 echo.
 choice /C YN /M "是否繼續"
 if errorlevel 2 goto :END
 
 echo.
 echo ============================================
-echo  步驟 1/6: 建立桌面捷徑
+echo  步驟 1/5: 建立桌面捷徑
 echo ============================================
 
 :: 使用 PowerShell 建立桌面捷徑（避免中文編碼問題）
@@ -88,7 +87,7 @@ echo [OK] 桌面捷徑已建立
 
 echo.
 echo ============================================
-echo  步驟 2/6: 設定開機自動啟動
+echo  步驟 2/5: 設定開機自動啟動
 echo ============================================
 
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
@@ -103,46 +102,53 @@ if %errorlevel%==0 (
 
 echo.
 echo ============================================
-echo  步驟 3/6: 設定每日自動爬蟲排程
-echo ============================================
-
-:: 刪除舊排程（如果存在）
-schtasks /delete /tn "28car_daily" /f >nul 2>&1
-
-:: 建立新排程（每天早上 6:00 執行）
-:: 使用 run_daily_exe.bat 給 exe 版本，run_daily.bat 給開發版本
-if exist "%SCRIPT_DIR%\28car_scraper.exe" (
-    schtasks /create /tn "28car_daily" /tr "%SCRIPT_DIR%\run_daily_exe.bat" /sc daily /st 06:00 /f >nul 2>&1
-) else (
-    schtasks /create /tn "28car_daily" /tr "%SCRIPT_DIR%\run_daily.bat" /sc daily /st 06:00 /f >nul 2>&1
-)
-if %errorlevel%==0 (
-    echo [OK] 每日排程已設定（每天早上 06:00 自動執行爬蟲）
-) else (
-    echo [!] 排程設定需要管理員權限，請手動設定
-    echo     或以管理員身分重新執行此安裝程式
-)
-
-echo.
-echo ============================================
-echo  步驟 4/6: 設定每日資料庫備份
+echo  步驟 3/5: 設定每日排程任務
 echo ============================================
 
 :: 刪除舊排程（如果存在）
 schtasks /delete /tn "28car_backup" /f >nul 2>&1
+schtasks /delete /tn "28car_daily" /f >nul 2>&1
+schtasks /delete /tn "28car_sms" /f >nul 2>&1
 
-:: 建立新排程（每天凌晨 05:00 備份，在爬蟲之前）
-schtasks /create /tn "28car_backup" /tr "%SCRIPT_DIR%\backup_db.bat" /sc daily /st 05:00 /f >nul 2>&1
-if %errorlevel%==0 (
-    echo [OK] 每日備份已設定（每天凌晨 05:00 自動備份資料庫）
-    echo     備份位置: %SCRIPT_DIR%\backup\
+:: 建立備份排程（每天 00:00）
+if exist "%SCRIPT_DIR%\28car_backup.exe" (
+    schtasks /create /tn "28car_backup" /tr "\"%SCRIPT_DIR%\28car_backup.exe\"" /sc daily /st 00:00 /f >nul 2>&1
 ) else (
-    echo [!] 備份排程設定需要管理員權限
+    schtasks /create /tn "28car_backup" /tr "python \"%SCRIPT_DIR%\backup_db.py\"" /sc daily /st 00:00 /f >nul 2>&1
+)
+if %errorlevel%==0 (
+    echo [OK] 28car_backup - 每天 00:00 自動備份資料庫
+) else (
+    echo [!] 備份排程設定失敗
+)
+
+:: 建立爬蟲排程（每天 01:00）
+if exist "%SCRIPT_DIR%\28car_scraper.exe" (
+    schtasks /create /tn "28car_daily" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --daily --stale-days 14" /sc daily /st 01:00 /f >nul 2>&1
+) else (
+    schtasks /create /tn "28car_daily" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --daily --stale-days 14" /sc daily /st 01:00 /f >nul 2>&1
+)
+if %errorlevel%==0 (
+    echo [OK] 28car_daily - 每天 01:00 自動執行爬蟲
+) else (
+    echo [!] 爬蟲排程設定失敗
+)
+
+:: 建立簡訊排程（每天 10:00）
+if exist "%SCRIPT_DIR%\28car_sms.exe" (
+    schtasks /create /tn "28car_sms" /tr "\"%SCRIPT_DIR%\28car_sms.exe\" --daily" /sc daily /st 10:00 /f >nul 2>&1
+) else (
+    schtasks /create /tn "28car_sms" /tr "python \"%SCRIPT_DIR%\sms_sender.py\" --daily" /sc daily /st 10:00 /f >nul 2>&1
+)
+if %errorlevel%==0 (
+    echo [OK] 28car_sms - 每天 10:00 自動發送簡訊
+) else (
+    echo [!] 簡訊排程設定失敗
 )
 
 echo.
 echo ============================================
-echo  步驟 5/6: 設定防火牆（允許區域網路連線）
+echo  步驟 4/5: 設定防火牆（允許區域網路連線）
 echo ============================================
 
 :: 刪除舊的防火牆規則（如果存在）
@@ -159,7 +165,7 @@ if %errorlevel%==0 (
 
 echo.
 echo ============================================
-echo  步驟 6/6: 啟動伺服器
+echo  步驟 5/5: 啟動伺服器
 echo ============================================
 
 :: 檢查是否已經在運行
@@ -187,23 +193,32 @@ echo  驗證排程設定
 echo ============================================
 
 :: 驗證排程任務是否建立成功
-set "DAILY_OK=0"
 set "BACKUP_OK=0"
-
-schtasks /query /tn "28car_daily" >nul 2>&1
-if %errorlevel%==0 (
-    set "DAILY_OK=1"
-    echo [OK] 每日爬蟲排程：已建立
-) else (
-    echo [!!] 每日爬蟲排程：建立失敗
-)
+set "DAILY_OK=0"
+set "SMS_OK=0"
 
 schtasks /query /tn "28car_backup" >nul 2>&1
 if %errorlevel%==0 (
     set "BACKUP_OK=1"
-    echo [OK] 每日備份排程：已建立
+    echo [OK] 28car_backup：已建立
 ) else (
-    echo [!!] 每日備份排程：建立失敗
+    echo [!!] 28car_backup：建立失敗
+)
+
+schtasks /query /tn "28car_daily" >nul 2>&1
+if %errorlevel%==0 (
+    set "DAILY_OK=1"
+    echo [OK] 28car_daily：已建立
+) else (
+    echo [!!] 28car_daily：建立失敗
+)
+
+schtasks /query /tn "28car_sms" >nul 2>&1
+if %errorlevel%==0 (
+    set "SMS_OK=1"
+    echo [OK] 28car_sms：已建立
+) else (
+    echo [!!] 28car_sms：建立失敗
 )
 
 echo.
@@ -215,14 +230,15 @@ echo  桌面已新增:
 echo    - 28Car Server（啟動伺服器）
 echo    - 28Car Web（開啟網頁）
 echo.
-if "!DAILY_OK!"=="1" if "!BACKUP_OK!"=="1" (
+if "!BACKUP_OK!"=="1" if "!DAILY_OK!"=="1" if "!SMS_OK!"=="1" (
     echo  [OK] 自動化設定（全部成功）:
 ) else (
     echo  [!] 自動化設定（部分失敗，請檢查上方訊息）:
 )
 echo    - 開機時伺服器會自動啟動
-echo    - 每天 05:00 自動備份資料庫（保留於 backup 資料夾）
-echo    - 每天 06:00 自動執行爬蟲更新資料
+echo    - 每天 00:00 自動備份資料庫
+echo    - 每天 01:00 自動執行爬蟲更新資料
+echo    - 每天 10:00 自動發送簡訊
 echo.
 echo  ============================================
 echo   連線網址

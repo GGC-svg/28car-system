@@ -22,7 +22,15 @@ from datetime import datetime, date, timedelta
 # ============================================================
 # 設定（支援環境變數覆蓋）
 # ============================================================
-BASE_DIR = os.environ.get('APP_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+import sys
+# PyInstaller 打包後，__file__ 會指向臨時目錄，需要用 sys.executable 取得 exe 所在目錄
+if getattr(sys, 'frozen', False):
+    # 打包成 exe 執行
+    _default_base = os.path.dirname(sys.executable)
+else:
+    # Python 腳本執行
+    _default_base = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
 FLASK_HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
 FLASK_PORT = int(os.environ.get('FLASK_PORT', '5000'))
@@ -42,6 +50,45 @@ app = Flask(__name__, static_folder=BASE_DIR)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
+
+
+def get_script_command(script_name, args=None):
+    """
+    取得執行腳本的命令，自動判斷使用 exe 或 python
+    script_name: 'scraper', 'sms', 'backup'
+    args: 額外參數列表，例如 ['--daily', '--stale-days', '14']
+    返回: 命令列表，例如 ['28car_scraper.exe', '--daily'] 或 ['python', 'scraper_28car.py', '--daily']
+    """
+    import subprocess
+
+    exe_map = {
+        'scraper': '28car_scraper.exe',
+        'sms': '28car_sms.exe',
+        'backup': '28car_backup.exe',
+        'server': '28car_server.exe'
+    }
+    py_map = {
+        'scraper': 'scraper_28car.py',
+        'sms': 'sms_sender.py',
+        'backup': 'backup_db.py',
+        'server': 'web_demo.py'
+    }
+
+    exe_path = os.path.join(BASE_DIR, exe_map.get(script_name, ''))
+    py_path = os.path.join(BASE_DIR, py_map.get(script_name, ''))
+
+    # 優先使用 exe（如果存在）
+    if os.path.exists(exe_path):
+        cmd = [exe_path]
+    elif os.path.exists(py_path):
+        cmd = [sys.executable, py_path]
+    else:
+        return None
+
+    if args:
+        cmd.extend(args)
+
+    return cmd
 
 
 def get_db():
@@ -2079,13 +2126,11 @@ def api_sms_send_now():
         return jsonify({'success': False, 'error': 'API 密碼未設定'}), 400
 
     try:
-        sms_script = os.path.join(BASE_DIR, 'sms_sender.py')
-        subprocess.Popen(
-            [sys.executable, sms_script, '--daily'],
-            cwd=BASE_DIR,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        cmd = get_script_command('sms', ['--daily'])
+        if not cmd:
+            return jsonify({'success': False, 'error': '找不到簡訊程式 (exe 或 py)'}), 400
+
+        subprocess.Popen(cmd, cwd=BASE_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return jsonify({'success': True, 'message': '簡訊發送任務已啟動'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -2343,49 +2388,67 @@ def api_admin_network_info():
     })
 
 
+def get_git_executable():
+    """取得 Git 執行檔路徑，優先使用 MinGit"""
+    import shutil
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 優先使用 MinGit（安裝包內附的）
+    mingit_path = os.path.join(script_dir, 'MinGit', 'cmd', 'git.exe')
+    if os.path.exists(mingit_path):
+        return mingit_path
+
+    # 其次使用系統 Git
+    system_git = shutil.which('git')
+    if system_git:
+        return system_git
+
+    return None
+
+
 @app.route('/api/admin/check-update')
 @admin_required
 def api_admin_check_update():
     """檢查程式更新"""
     import subprocess
-    import os
-    
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
+    git_exe = get_git_executable()
+
     try:
         # 檢查是否有 git
-        result = subprocess.run(['git', '--version'], capture_output=True, text=True, cwd=script_dir)
-        if result.returncode != 0:
-            return jsonify({'error': 'Git 未安裝', 'has_update': False})
-        
+        if not git_exe:
+            return jsonify({'error': 'Git 未安裝（MinGit 也不存在）', 'has_update': False})
+
         # 檢查是否是 git repo
-        result = subprocess.run(['git', 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=script_dir)
+        result = subprocess.run([git_exe, 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=script_dir)
         if result.returncode != 0:
             return jsonify({'error': '此目錄不是 Git 倉庫', 'has_update': False})
-        
+
         # Fetch 遠端更新
-        subprocess.run(['git', 'fetch', 'origin'], capture_output=True, text=True, cwd=script_dir)
-        
+        subprocess.run([git_exe, 'fetch', 'origin'], capture_output=True, text=True, cwd=script_dir)
+
         # 取得本地和遠端版本
-        local = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
-        remote = subprocess.run(['git', 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
-        
+        local = subprocess.run([git_exe, 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
+        remote = subprocess.run([git_exe, 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
+
         has_update = local != remote
-        
+
         # 取得更新內容
         commits = []
         if has_update:
             log_result = subprocess.run(
-                ['git', 'log', '--oneline', 'HEAD..origin/main'],
+                [git_exe, 'log', '--oneline', 'HEAD..origin/main'],
                 capture_output=True, text=True, cwd=script_dir
             )
             commits = log_result.stdout.strip().split('\n') if log_result.stdout.strip() else []
-        
+
         return jsonify({
             'has_update': has_update,
             'local_version': local[:8],
             'remote_version': remote[:8],
-            'commits': commits
+            'commits': commits,
+            'git_source': 'MinGit' if 'MinGit' in git_exe else 'System'
         })
     except Exception as e:
         return jsonify({'error': str(e), 'has_update': False})
@@ -2396,13 +2459,16 @@ def api_admin_check_update():
 def api_admin_do_update():
     """執行程式更新"""
     import subprocess
-    import os
-    
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
+    git_exe = get_git_executable()
+
+    if not git_exe:
+        return jsonify({'success': False, 'error': 'Git 未安裝'})
+
     try:
         result = subprocess.run(
-            ['git', 'pull', 'origin', 'main', '--ff-only'],
+            [git_exe, 'pull', 'origin', 'main', '--ff-only'],
             capture_output=True, text=True, cwd=script_dir
         )
         
@@ -2554,15 +2620,34 @@ def api_admin_update_schedule():
     schedule_type = data.get('type')  # 'scraper' or 'backup'
     new_time = data.get('time')  # 'HH:MM' 格式
 
-    if schedule_type not in ('scraper', 'backup'):
+    valid_types = ('scraper', 'backup', 'sms')
+    if schedule_type not in valid_types:
         return jsonify({'error': '無效的排程類型'}), 400
 
     if not new_time or not re.match(r'^\d{2}:\d{2}$', new_time):
         return jsonify({'error': '時間格式無效，請使用 HH:MM 格式'}), 400
 
-    task_name = '28car_daily' if schedule_type == 'scraper' else '28car_backup'
-    script_name = 'run_daily.bat' if schedule_type == 'scraper' else 'backup_db.bat'
-    script_path = os.path.join(BASE_DIR, script_name)
+    # 排程任務名稱對應
+    task_names = {
+        'scraper': '28car_daily',
+        'backup': '28car_backup',
+        'sms': '28car_sms'
+    }
+    task_name = task_names[schedule_type]
+
+    # 取得執行命令（優先 exe，其次 py）
+    if schedule_type == 'scraper':
+        cmd = get_script_command('scraper', ['--daily', '--stale-days', '14'])
+    elif schedule_type == 'sms':
+        cmd = get_script_command('sms', ['--daily'])
+    else:
+        cmd = get_script_command('backup')
+
+    if not cmd:
+        return jsonify({'error': '找不到對應的程式 (exe 或 py)'}), 400
+
+    # 組合命令字串（schtasks 需要完整命令）
+    script_path = ' '.join(f'"{c}"' if ' ' in c else c for c in cmd)
 
     try:
         # 刪除舊排程
@@ -2592,15 +2677,12 @@ def api_admin_run_daily_scraper():
     """立即執行每日爬蟲（Daily 模式，非完整爬蟲）"""
     import subprocess
     import threading
-    import sys
-    from datetime import datetime
 
-    # 優先使用 Python 直接執行，避免 bat 檔的編碼問題
-    scraper_path = os.path.join(BASE_DIR, 'scraper_28car.py')
     daily_log_path = os.path.join(BASE_DIR, 'daily_task.log')
 
-    if not os.path.exists(scraper_path):
-        return jsonify({'success': False, 'error': '找不到 scraper_28car.py'})
+    cmd = get_script_command('scraper', ['--daily', '--stale-days', '14'])
+    if not cmd:
+        return jsonify({'success': False, 'error': '找不到爬蟲程式 (exe 或 py)'})
 
     def write_log(msg):
         """寫入每日任務日誌"""
@@ -2616,13 +2698,7 @@ def api_admin_run_daily_scraper():
             write_log("手動觸發每日爬蟲")
             write_log("開始執行爬蟲...")
 
-            # 直接用 Python 執行爬蟲
-            result = subprocess.run(
-                [sys.executable, scraper_path, '--daily', '--stale-days', '14'],
-                cwd=BASE_DIR,
-                capture_output=True,
-                text=True
-            )
+            result = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True)
 
             if result.returncode == 0:
                 write_log("爬蟲執行成功")
@@ -2652,17 +2728,13 @@ def api_admin_run_daily_scraper():
 def api_admin_run_backup():
     """立即執行資料庫備份"""
     import subprocess
-    import sys
 
-    # 優先使用 Python 版本
-    script_path = os.path.join(BASE_DIR, 'backup_db.py')
-
-    if not os.path.exists(script_path):
-        return jsonify({'success': False, 'error': '找不到 backup_db.py'})
+    cmd = get_script_command('backup')
+    if not cmd:
+        return jsonify({'success': False, 'error': '找不到備份程式 (exe 或 py)'})
 
     try:
-        result = subprocess.run([sys.executable, script_path], cwd=BASE_DIR,
-                               capture_output=True, timeout=60)
+        result = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, timeout=60)
 
         log_operation(request.current_user['id'], 'RUN_BACKUP', None, None, {})
 
@@ -2694,20 +2766,15 @@ def api_admin_run_backup():
 def api_admin_run_sms():
     """立即執行簡訊發送（強制執行，忽略時間區間）"""
     import subprocess
-    import sys
     import threading
 
-    sms_script = os.path.join(BASE_DIR, 'sms_sender.py')
-
-    if not os.path.exists(sms_script):
-        return jsonify({'success': False, 'error': '找不到 sms_sender.py'})
+    cmd = get_script_command('sms', ['--daily', '--force'])
+    if not cmd:
+        return jsonify({'success': False, 'error': '找不到簡訊程式 (exe 或 py)'})
 
     def run_sms():
         try:
-            subprocess.run(
-                [sys.executable, sms_script, '--daily', '--force'],
-                cwd=BASE_DIR
-            )
+            subprocess.run(cmd, cwd=BASE_DIR)
         except Exception as e:
             log.error(f"執行簡訊發送失敗: {e}")
 
@@ -2780,7 +2847,51 @@ def index():
     return send_from_directory(BASE_DIR, 'index.html')
 
 
+def kill_existing_server():
+    """啟動前先關閉已存在的伺服器進程"""
+    import subprocess
+    import sys
+
+    # 取得當前進程名稱
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包後的 exe
+        exe_name = os.path.basename(sys.executable)
+    else:
+        exe_name = None
+
+    if exe_name and exe_name.lower() == '28car_server.exe':
+        try:
+            # 取得當前進程 ID
+            current_pid = os.getpid()
+
+            # 使用 tasklist 找出所有同名進程
+            result = subprocess.run(
+                ['tasklist', '/FI', f'IMAGENAME eq {exe_name}', '/FO', 'CSV', '/NH'],
+                capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+            )
+
+            # 解析並殺掉非當前進程
+            for line in result.stdout.strip().split('\n'):
+                if line and exe_name.lower() in line.lower():
+                    parts = line.replace('"', '').split(',')
+                    if len(parts) >= 2:
+                        try:
+                            pid = int(parts[1])
+                            if pid != current_pid:
+                                subprocess.run(
+                                    ['taskkill', '/F', '/PID', str(pid)],
+                                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW
+                                )
+                                print(f"  已關閉舊的伺服器進程 (PID: {pid})")
+                        except (ValueError, IndexError):
+                            pass
+        except Exception as e:
+            pass  # 忽略錯誤，繼續啟動
+
 if __name__ == '__main__':
+    # 先關閉已存在的伺服器
+    kill_existing_server()
+
     print("=" * 50)
     print("  28car Demo 網站")
     print(f"  http://localhost:{FLASK_PORT}")

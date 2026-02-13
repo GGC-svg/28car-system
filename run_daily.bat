@@ -8,12 +8,12 @@ REM 【注意】執行「一鍵部署安裝.bat」會自動設定每日排程！
 REM        一般情況下不需要手動設定。
 REM
 REM 使用方式：
-REM   1. 自動執行: 由 Windows 排程每天 06:00 自動執行
+REM   1. 自動執行: 由 Windows 排程每天 01:00 自動執行
 REM   2. 手動執行: 雙擊此檔案
 REM
 REM 手動設定排程（如自動設定失敗）：
 REM   以管理員身分執行 CMD：
-REM   schtasks /create /tn "28car_daily" /tr "安裝路徑\run_daily.bat" /sc daily /st 06:00 /f
+REM   schtasks /create /tn "28car_daily" /tr "安裝路徑\run_daily.bat" /sc daily /st 01:00 /f
 REM
 REM   刪除排程：
 REM   schtasks /delete /tn "28car_daily" /f

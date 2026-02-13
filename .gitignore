@@ -60,8 +60,28 @@ tmpclaude-*
 *.json
 !sms_config.json
 
-# 編譯產物
-*.exe
+# 編譯產物（exe 保留在 git 中，方便遠端更新）
+# *.exe
+
+# PyInstaller 建置產物
+*.spec
+/build/
+/dist/
+
+# Inno Setup 輸出
+/Output/
+
+# 壓縮檔（太大）
+*.7z
+
+# 開發用腳本（不需要給用戶）
+download_dependencies.py
+download_mingit.bat
+
+# 測試圖片
+01.png
+02.png
+03.png
 
 # Claude 設定
 .claude/

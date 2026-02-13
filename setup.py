@@ -136,17 +136,17 @@ def setup_scheduled_tasks():
     is_exe = os.path.exists(os.path.join(BASE_DIR, '28car_scraper.exe'))
 
     if is_exe:
-        # EXE 版本
+        # EXE 版本 - 直接執行 exe
         tasks = [
-            ('28car_backup', '05:00', 'copy /Y "cars_28car.db" "backup\\cars_28car_backup.db"', '每日備份', 'cmd'),
-            ('28car_daily', '06:00', os.path.join(BASE_DIR, 'run_daily_exe.bat'), '每日爬蟲', 'bat'),
-            ('28car_sms', '10:00', os.path.join(BASE_DIR, 'sms_sender.py'), '每日簡訊', 'py'),
+            ('28car_backup', '00:00', os.path.join(BASE_DIR, '28car_backup.exe'), '每日備份', 'exe'),
+            ('28car_daily', '01:00', os.path.join(BASE_DIR, '28car_scraper.exe') + '" --daily --stale-days 14', '每日爬蟲', 'exe_args'),
+            ('28car_sms', '10:00', os.path.join(BASE_DIR, '28car_sms.exe') + '" --daily', '每日簡訊', 'exe_args'),
         ]
     else:
         # Python 版本
         tasks = [
-            ('28car_backup', '05:00', os.path.join(BASE_DIR, 'backup_db.py'), '每日備份', 'py'),
-            ('28car_daily', '06:00', os.path.join(BASE_DIR, 'scraper_28car.py') + '" --daily --stale-days 14', '每日爬蟲', 'py_args'),
+            ('28car_backup', '00:00', os.path.join(BASE_DIR, 'backup_db.py'), '每日備份', 'py'),
+            ('28car_daily', '01:00', os.path.join(BASE_DIR, 'scraper_28car.py') + '" --daily --stale-days 14', '每日爬蟲', 'py_args'),
             ('28car_sms', '10:00', os.path.join(BASE_DIR, 'sms_sender.py') + '" --daily', '每日簡訊', 'py_args'),
         ]
 
@@ -158,7 +158,14 @@ def setup_scheduled_tasks():
         )
 
         # 根據類型建立執行命令
-        if script_type == 'py':
+        if script_type == 'exe':
+            tr = f'"{script}"'
+        elif script_type == 'exe_args':
+            # 格式: path.exe" --args
+            script_path = script.split('" ')[0]
+            args = script.split('" ')[1] if '" ' in script else ''
+            tr = f'"{script_path}" {args}'
+        elif script_type == 'py':
             tr = f'"{sys.executable}" "{script}"'
         elif script_type == 'py_args':
             # 格式: path.py" --args
