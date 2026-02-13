@@ -456,13 +456,18 @@ def api_cars():
 
     offset = (page - 1) * per_page
     rows = db.execute(
-        f'SELECT c.*, cg.classification as contact_classification, cg.car_count as contact_car_count {base_query} ORDER BY {order_sql} LIMIT ? OFFSET ?',
+        f'SELECT c.*, cg.classification as contact_classification, cg.car_count as contact_car_count, cg.canonical_name as group_contact_name, cg.canonical_phone as group_contact_phone {base_query} ORDER BY {order_sql} LIMIT ? OFFSET ?',
         params + [per_page, offset]
     ).fetchall()
 
     cars = []
     for row in rows:
         car = dict(row)
+        # 如果 cars 表的聯絡人資訊為空，從 contact_groups 補充
+        if not car.get('contact_name') and car.get('group_contact_name'):
+            car['contact_name'] = car['group_contact_name']
+        if not car.get('contact_phone') and car.get('group_contact_phone'):
+            car['contact_phone'] = car['group_contact_phone']
         # 今日狀態
         fs = car.get('first_seen', '') or ''
         sa = car.get('scraped_at', '') or ''
@@ -526,7 +531,8 @@ def api_car_detail(vid):
     today_str = date.today().isoformat()
     row = db.execute('''
         SELECT c.*, cg.classification as contact_classification,
-               cg.car_count as contact_car_count, cg.group_id as contact_group_id_info
+               cg.car_count as contact_car_count, cg.group_id as contact_group_id_info,
+               cg.canonical_name as group_contact_name, cg.canonical_phone as group_contact_phone
         FROM cars c
         LEFT JOIN contact_groups cg ON c.contact_group_id = cg.group_id
         WHERE c.vid = ?
@@ -535,6 +541,11 @@ def api_car_detail(vid):
         db.close()
         return jsonify({'error': 'not found'}), 404
     car = dict(row)
+    # 如果 cars 表的聯絡人資訊為空，從 contact_groups 補充
+    if not car.get('contact_name') and car.get('group_contact_name'):
+        car['contact_name'] = car['group_contact_name']
+    if not car.get('contact_phone') and car.get('group_contact_phone'):
+        car['contact_phone'] = car['group_contact_phone']
     fs = car.get('first_seen', '') or ''
     sa = car.get('scraped_at', '') or ''
     if fs >= today_str:
@@ -549,11 +560,21 @@ def api_car_detail(vid):
     ).fetchall()
     car['photos'] = [dict(p) for p in photos]
 
-    # 取得該車輛的溝通紀錄（使用 vid 關聯）
-    logs = db.execute(
-        'SELECT * FROM contact_logs WHERE vid = ? ORDER BY contacted_at DESC',
-        (vid,)
-    ).fetchall()
+    # 取得該車輛的溝通紀錄
+    # 包含：1. vid 直接匹配  2. 同一聯絡人下 vid=NULL 的紀錄
+    contact_group_id = car.get('contact_group_id')
+    if contact_group_id:
+        logs = db.execute(
+            '''SELECT * FROM contact_logs
+               WHERE vid = ? OR (group_id = ? AND vid IS NULL)
+               ORDER BY contacted_at DESC''',
+            (vid, contact_group_id)
+        ).fetchall()
+    else:
+        logs = db.execute(
+            'SELECT * FROM contact_logs WHERE vid = ? ORDER BY contacted_at DESC',
+            (vid,)
+        ).fetchall()
     car['contact_logs'] = [dict(l) for l in logs]
 
     db.close()
@@ -791,13 +812,12 @@ def api_contacts():
     if last_days:
         if last_days == 'never':
             where.append('(cl.last_contacted_at IS NULL)')
-        else:
+        elif last_days.isdigit():  # 防止 SQL 注入
             where.append(f"cl.last_contacted_at >= date('now', '-{last_days} days')")
     if contacted_by:
         where.append('lcb.last_contacted_by = ?')
         params.append(contacted_by)
-    if update_days:
-        # 28car 格式是 DD/MMhh:mm，需要轉換來比較
+    if update_days and update_days.isdigit():  # 防止 SQL 注入
         # 使用 last_car_update 欄位，它來自 cars 表的 updated_at
         where.append(f"cu.last_car_update >= date('now', '-{update_days} days')")
     if price_changed == 'yes':
@@ -805,16 +825,8 @@ def api_contacts():
 
     where_sql = ' AND '.join(where) if where else '1=1'
 
-    sort_map = {
-        'car_count_desc': 'active_car_count DESC',
-        'car_count_asc': 'active_car_count ASC',
-        'name_asc': 'cg.canonical_name ASC',
-        'last_contact': 'last_contacted_at DESC',
-        'log_count_desc': 'log_count DESC',
-        'last_update': 'last_car_update DESC',
-        'sms_count_desc': 'sms_count DESC',
-    }
-    order_sql = sort_map.get(sort, 'active_car_count DESC')
+    # 固定排序：1. 意願欄有資料的優先 2. 更新日期最新的優先
+    order_sql = "CASE WHEN cg.intention_status IS NOT NULL AND cg.intention_status != '' THEN 0 ELSE 1 END, last_car_update DESC"
 
     # 透過 vid 關聯溝通紀錄（聯絡人的所有車輛的溝通紀錄）
     # 根據 show_sold 參數動態計算車輛數
@@ -836,23 +848,19 @@ def api_contacts():
             FROM cars WHERE {sold_filter} GROUP BY contact_group_id
         ) ac ON cg.group_id = ac.contact_group_id
         LEFT JOIN (
-            SELECT c.contact_group_id as group_id,
+            SELECT COALESCE(c.contact_group_id, l.group_id) as group_id,
                    COUNT(*) as log_count,
                    MAX(l.contacted_at) as last_contacted_at
             FROM contact_logs l
-            JOIN cars c ON l.vid = c.vid
-            GROUP BY c.contact_group_id
+            LEFT JOIN cars c ON l.vid = c.vid
+            GROUP BY COALESCE(c.contact_group_id, l.group_id)
         ) cl ON cg.group_id = cl.group_id
         LEFT JOIN (
-            SELECT c.contact_group_id as group_id, l1.contacted_by as last_contacted_by
-            FROM contact_logs l1
-            JOIN cars c ON l1.vid = c.vid
-            INNER JOIN (
-                SELECT c2.contact_group_id, MAX(l2.contacted_at) as max_at
-                FROM contact_logs l2
-                JOIN cars c2 ON l2.vid = c2.vid
-                GROUP BY c2.contact_group_id
-            ) l2 ON c.contact_group_id = l2.contact_group_id AND l1.contacted_at = l2.max_at
+            SELECT group_id, contacted_by as last_contacted_by
+            FROM contact_logs
+            WHERE id IN (
+                SELECT MAX(id) FROM contact_logs GROUP BY group_id
+            )
         ) lcb ON cg.group_id = lcb.group_id
         LEFT JOIN (
             SELECT contact_group_id,
@@ -935,13 +943,12 @@ def api_contacts_export():
     if last_days:
         if last_days == 'never':
             where.append('(cl.last_contacted_at IS NULL)')
-        else:
+        elif last_days.isdigit():  # 防止 SQL 注入
             where.append(f"cl.last_contacted_at >= date('now', '-{last_days} days')")
     if contacted_by:
         where.append('lcb.last_contacted_by = ?')
         params.append(contacted_by)
-    if update_days:
-        # 28car 格式是 DD/MMhh:mm，需要轉換來比較
+    if update_days and update_days.isdigit():  # 防止 SQL 注入
         # 使用 last_car_update 欄位，它來自 cars 表的 updated_at
         where.append(f"cu.last_car_update >= date('now', '-{update_days} days')")
     if price_changed == 'yes':
@@ -1108,20 +1115,87 @@ def api_contact_detail(group_id):
     # 計算在售車輛數
     result['active_car_count'] = sum(1 for c in result['cars'] if not c.get('is_sold'))
 
-    # 取得該聯絡人所有車輛的溝通紀錄（透過 vid 關聯）
+    # 取得該聯絡人所有溝通紀錄（透過 vid 或 group_id 關聯）
     vid_list = [c['vid'] for c in result['cars']]
     if vid_list:
         placeholders = ','.join(['?'] * len(vid_list))
+        # 同時查詢：vid 在車輛列表中，或者 group_id 直接匹配
+        # 當 vid 為 NULL 時，嘗試從 group_id 找第一輛車的資訊
         logs = db.execute(
-            f'SELECT l.*, c.make, c.model FROM contact_logs l LEFT JOIN cars c ON l.vid = c.vid WHERE l.vid IN ({placeholders}) ORDER BY l.contacted_at DESC',
-            vid_list
+            f'''SELECT l.*,
+                COALESCE(c.make, (SELECT make FROM cars WHERE contact_group_id = l.group_id LIMIT 1)) as make,
+                COALESCE(c.model, (SELECT model FROM cars WHERE contact_group_id = l.group_id LIMIT 1)) as model,
+                COALESCE(c.car_no, (SELECT car_no FROM cars WHERE contact_group_id = l.group_id LIMIT 1)) as car_no
+                FROM contact_logs l
+                LEFT JOIN cars c ON l.vid = c.vid
+                WHERE l.vid IN ({placeholders}) OR l.group_id = ?
+                ORDER BY l.contacted_at DESC''',
+            vid_list + [group_id]
         ).fetchall()
     else:
-        logs = []
+        # 沒有車輛時，直接用 group_id 查詢
+        logs = db.execute(
+            '''SELECT l.*,
+                (SELECT make FROM cars WHERE contact_group_id = l.group_id LIMIT 1) as make,
+                (SELECT model FROM cars WHERE contact_group_id = l.group_id LIMIT 1) as model,
+                (SELECT car_no FROM cars WHERE contact_group_id = l.group_id LIMIT 1) as car_no
+                FROM contact_logs l WHERE l.group_id = ? ORDER BY l.contacted_at DESC''',
+            (group_id,)
+        ).fetchall()
     result['logs'] = [dict(l) for l in logs]
 
     db.close()
     return jsonify(result)
+
+
+@app.route('/api/contact/<int:group_id>/logs-summary')
+@login_required
+def api_contact_logs_summary(group_id):
+    """取得聯絡人的溝通紀錄摘要（按車輛分組）"""
+    db = get_db()
+
+    # 取得該聯絡人的所有車輛
+    cars = db.execute(
+        'SELECT vid, car_no, make, model, year FROM cars WHERE contact_group_id = ? ORDER BY first_seen DESC',
+        (group_id,)
+    ).fetchall()
+
+    result = []
+    for car in cars:
+        # 取得每輛車的溝通紀錄
+        logs = db.execute(
+            '''SELECT id, contacted_by, contact_method, content, contacted_at, intention_status
+               FROM contact_logs WHERE vid = ? ORDER BY contacted_at DESC LIMIT 3''',
+            (car['vid'],)
+        ).fetchall()
+
+        if logs:
+            result.append({
+                'vid': car['vid'],
+                'car_no': car['car_no'],
+                'car_info': f"{car['make']} {car['model']} ({car['year'] or '-'})",
+                'log_count': len(logs),
+                'logs': [dict(l) for l in logs]
+            })
+
+    # 也檢查 vid=NULL 但 group_id 匹配的紀錄
+    orphan_logs = db.execute(
+        '''SELECT id, contacted_by, contact_method, content, contacted_at, intention_status
+           FROM contact_logs WHERE vid IS NULL AND group_id = ? ORDER BY contacted_at DESC''',
+        (group_id,)
+    ).fetchall()
+
+    if orphan_logs:
+        result.append({
+            'vid': None,
+            'car_no': '-',
+            'car_info': '(未指定車輛)',
+            'log_count': len(orphan_logs),
+            'logs': [dict(l) for l in orphan_logs]
+        })
+
+    db.close()
+    return jsonify({'cars': result})
 
 
 @app.route('/api/car/<vid>/logs', methods=['POST'])
@@ -1143,9 +1217,11 @@ def api_add_car_contact_log(vid):
     # 誰聯絡的自動帶入登入帳號的顯示名稱
     contacted_by = request.current_user.get('display_name') or request.current_user.get('username')
 
+    intention_status = data.get('intention_status', '')
+
     db.execute('''
-        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, intention_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         vid,
         group_id,
@@ -1153,11 +1229,11 @@ def api_add_car_contact_log(vid):
         data.get('contact_method', ''),
         data.get('content', ''),
         data.get('contacted_at', now),
+        intention_status,
         now, now
     ))
 
-    # 如果有設定意願狀態，同時更新 contact_groups
-    intention_status = data.get('intention_status', '')
+    # 同步更新 contact_groups 的意願狀態（取最新的）
     if intention_status and group_id:
         db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
                    (intention_status, group_id))
@@ -1165,6 +1241,11 @@ def api_add_car_contact_log(vid):
     # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
     if intention_status == 'sold':
         db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+        # 同步更新 contact_groups 的 active_car_count
+        if group_id:
+            db.execute('''UPDATE contact_groups SET 
+                active_car_count = (SELECT COUNT(*) FROM cars WHERE contact_group_id = ? AND is_sold = 0)
+                WHERE group_id = ?''', (group_id, group_id))
         log.info(f"車輛 {vid} 已標記為已售（透過溝通紀錄）")
 
     db.commit()
@@ -1189,9 +1270,11 @@ def api_add_contact_log(group_id):
     # 誰聯絡的自動帶入登入帳號的顯示名稱
     contacted_by = request.current_user.get('display_name') or request.current_user.get('username')
 
+    intention_status = data.get('intention_status', '')
+
     db.execute('''
-        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO contact_logs (vid, group_id, contacted_by, contact_method, content, contacted_at, intention_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         vid,
         group_id,
@@ -1199,11 +1282,11 @@ def api_add_contact_log(group_id):
         data.get('contact_method', ''),
         data.get('content', ''),
         data.get('contacted_at', now),
+        intention_status,
         now, now
     ))
 
-    # 如果有設定意願狀態，同時更新 contact_groups
-    intention_status = data.get('intention_status', '')
+    # 同步更新 contact_groups 的意願狀態（取最新的）
     if intention_status:
         db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
                    (intention_status, group_id))
@@ -1211,6 +1294,10 @@ def api_add_contact_log(group_id):
     # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
     if intention_status == 'sold' and vid:
         db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
+        # 同步更新 contact_groups 的 active_car_count
+        db.execute('''UPDATE contact_groups SET 
+            active_car_count = (SELECT COUNT(*) FROM cars WHERE contact_group_id = ? AND is_sold = 0)
+            WHERE group_id = ?''', (group_id, group_id))
         log.info(f"車輛 {vid} 已標記為已售（透過溝通紀錄）")
 
     db.commit()
@@ -1229,7 +1316,8 @@ def api_update_contact_log(log_id):
 
     fields = []
     params = []
-    for key in ('contact_method', 'content', 'contacted_at'):  # contacted_by 不可修改
+    # 可更新的欄位（contacted_by 不可修改）
+    for key in ('contact_method', 'content', 'contacted_at', 'intention_status'):
         if key in data:
             fields.append(f'{key} = ?')
             params.append(data[key])
@@ -1243,7 +1331,7 @@ def api_update_contact_log(log_id):
     params.append(log_id)
     db.execute(f"UPDATE contact_logs SET {', '.join(fields)} WHERE id = ?", params)
 
-    # 如果有設定意願狀態，同時更新 contact_groups
+    # 同步更新 contact_groups 的意願狀態（取該筆紀錄的狀態）
     intention_status = data.get('intention_status', '')
     group_id = data.get('group_id')
     if intention_status and group_id:
@@ -1252,10 +1340,15 @@ def api_update_contact_log(log_id):
 
     # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
     if intention_status == 'sold':
-        # 從 contact_logs 取得 vid
-        log_row = db.execute('SELECT vid FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+        # 從 contact_logs 取得 vid 和 group_id
+        log_row = db.execute('SELECT vid, group_id FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
         if log_row and log_row['vid']:
             db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (log_row['vid'],))
+            # 同步更新 contact_groups 的 active_car_count
+            if log_row['group_id']:
+                db.execute('''UPDATE contact_groups SET 
+                    active_car_count = (SELECT COUNT(*) FROM cars WHERE contact_group_id = ? AND is_sold = 0)
+                    WHERE group_id = ?''', (log_row['group_id'], log_row['group_id']))
             log.info(f"車輛 {log_row['vid']} 已標記為已售（透過溝通紀錄更新）")
 
     db.commit()

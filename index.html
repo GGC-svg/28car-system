@@ -259,6 +259,7 @@ body {
 .btn-red:hover { box-shadow: 0 6px 20px rgba(255,65,108,0.4); }
 .btn-gray { background: #666; box-shadow: none; }
 .btn-gray:hover { background: #555; }
+.btn-expand {  background: transparent;  border: 1px solid #ddd;  color: #666;  padding: 4px 8px;  font-size: 14px;  cursor: pointer;  border-radius: 4px;  transition: all 0.2s;}.btn-expand:hover { background: #f5f5f5; border-color: #ccc; }.btn-expand.expanded { background: #e3f2fd; border-color: #2196F3; color: #1976D2; }/* 展開的溝通紀錄列 */.contact-logs-row { background: #fafafa; }.contact-logs-row td { padding: 0 !important; }.contact-logs-content { padding: 15px 20px; }.contact-logs-content .vehicle-group {  background: white;  border: 1px solid #e0e0e0;  border-radius: 8px;  margin-bottom: 10px;  padding: 12px 15px;}.contact-logs-content .vehicle-title {  font-weight: 600;  color: #333;  margin-bottom: 8px;  display: flex;  align-items: center;  gap: 8px;}.contact-logs-content .log-item {  font-size: 13px;  color: #666;  padding: 4px 0;  border-bottom: 1px solid #f0f0f0;}.contact-logs-content .log-item:last-child { border-bottom: none; }.contact-logs-content .log-date { color: #999; font-size: 12px; }
 
 /* Badges - Premium */
 .badge { 
@@ -324,6 +325,9 @@ body {
 .log-meta { font-size:12px; color:#888; margin-bottom:4px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
 .log-meta b { color:#555; }
 .log-content { font-size:13px; line-height:1.6; white-space:pre-wrap; }
+.car-link { color:#1976d2; font-size:12px; cursor:pointer; text-decoration:underline; }
+.car-link:hover { color:#1565c0; }
+.car-info { color:#1976d2; font-size:12px; }
 .log-actions { position:absolute; top:8px; right:10px; display:flex; gap:4px; opacity:0; transition:opacity .15s; }
 .log-entry:hover .log-actions { opacity:1; }
 .log-actions button { padding:2px 8px; font-size:11px; border:1px solid #ddd; background:#fff; border-radius:4px; cursor:pointer; }
@@ -336,6 +340,16 @@ body {
 .method-tag.m-whatsapp { background:#e8f5e9; color:#1b5e20; }
 .method-tag.m-visit { background:#f3e5f5; color:#7b1fa2; }
 .method-tag.m-other { background:#f5f5f5; color:#666; }
+
+/* Contact logs card in expanded row */
+.contact-logs-card { margin-bottom:12px; padding:10px; background:#fff; border-radius:6px; border:1px solid #e0e0e0; }
+.contact-logs-card .car-title { color:#1976d2; }
+.contact-logs-card .car-no { font-size:12px; color:#888; }
+.contact-log-item { font-size:13px; padding:6px 0; border-top:1px solid #eee; }
+.contact-log-item .log-time { color:#555; }
+.contact-log-item .log-by { color:#888; }
+.contact-log-item .log-text { margin-top:4px; color:#333; }
+.contact-logs-cell { padding:0; background:#f5f5f5; }
 
 /* Grid - Premium */
 .container { 
@@ -1025,11 +1039,34 @@ body.dark-mode .log-entry:hover {
   background: #363652 !important;
 }
 body.dark-mode .log-entry .log-meta span {
+  color: #aaa;
+}
+body.dark-mode .log-entry .log-meta b {
   color: #ccc;
 }
 body.dark-mode .log-entry .log-content {
-  color: #aaa;
+  color: #ccc;
 }
+body.dark-mode .car-link { color: #64b5f6; }
+body.dark-mode .car-link:hover { color: #90caf9; }
+body.dark-mode .car-info { color: #64b5f6; }
+/* Dark mode - Method tags */
+body.dark-mode .method-tag.m-phone { background: #1b5e20; color: #c8e6c9; }
+body.dark-mode .method-tag.m-sms { background: #0d47a1; color: #bbdefb; }
+body.dark-mode .method-tag.m-email { background: #e65100; color: #ffe0b2; }
+body.dark-mode .method-tag.m-whatsapp { background: #1b5e20; color: #c8e6c9; }
+body.dark-mode .method-tag.m-visit { background: #6a1b9a; color: #e1bee7; }
+body.dark-mode .method-tag.m-other { background: #424242; color: #e0e0e0; }
+
+/* Dark mode - Contact logs card */
+body.dark-mode .contact-logs-card { background: #2d2d44; border-color: #444; }
+body.dark-mode .contact-logs-card .car-title { color: #64b5f6; }
+body.dark-mode .contact-logs-card .car-no { color: #aaa; }
+body.dark-mode .contact-log-item { border-top-color: #444; }
+body.dark-mode .contact-log-item .log-time { color: #aaa; }
+body.dark-mode .contact-log-item .log-by { color: #999; }
+body.dark-mode .contact-log-item .log-text { color: #ccc; }
+body.dark-mode .contact-logs-cell { background: #1a1a2e; }
 
 /* Dark mode - Log form */
 body.dark-mode .log-form {
@@ -1088,6 +1125,38 @@ body.dark-mode .similar-car-specs span {
   color: #ccc !important;
 }
 body.dark-mode .similar-car-time {
+  color: #888 !important;
+}
+
+/* Dark mode - 展開/折疊溝通紀錄 */
+body.dark-mode .btn-expand {
+  border-color: #555;
+  color: #aaa;
+}
+body.dark-mode .btn-expand:hover {
+  background: #2a2a3e;
+  border-color: #666;
+}
+body.dark-mode .btn-expand.expanded {
+  background: #1a2e3e;
+  border-color: #2196F3;
+  color: #64b5f6;
+}
+body.dark-mode .contact-logs-row {
+  background: #1a1a2e !important;
+}
+body.dark-mode .contact-logs-content .vehicle-group {
+  background: #2a2a3e !important;
+  border-color: #444 !important;
+}
+body.dark-mode .contact-logs-content .vehicle-title {
+  color: #e0e0e0 !important;
+}
+body.dark-mode .contact-logs-content .log-item {
+  color: #bbb !important;
+  border-bottom-color: #333 !important;
+}
+body.dark-mode .contact-logs-content .log-date {
   color: #888 !important;
 }
 
@@ -3237,6 +3306,9 @@ function renderCard(car) {
 // ============================================================
 // Car Detail Modal
 // ============================================================
+// 暫存當前車輛詳情（用於新增溝通紀錄顯示車輛資訊）
+let currentCarCache = null;
+
 async function openDetail(vid) {
   openModal('carModal');
   document.getElementById('carModalBody').innerHTML = '<div class="loading">載入中...</div>';
@@ -3244,6 +3316,7 @@ async function openDetail(vid) {
   try {
     const r = await fetch(`/api/car/${vid}`);
     const car = await r.json();
+    currentCarCache = car;  // 快取車輛詳情
     document.getElementById('carModalTitle').textContent = `${car.make} ${car.model}`;
     document.getElementById('carModalBody').innerHTML = renderDetail(car);
 
@@ -3413,18 +3486,23 @@ function renderCarLogEntry(log) {
   const mLabel = methodLabels[method] || method;
   const contactedAt = log.contacted_at ? log.contacted_at.replace('T', ' ').substring(0, 16) : '';
 
-  return `<div class="log-entry" id="carLogEntry_${log.id}" style="border:1px solid #e0e0e0;border-radius:6px;padding:10px;margin-bottom:8px;background:#fafafa">
+  // 顯示關聯車輛資訊
+  const carInfo = currentCarCache ? `${currentCarCache.make || ''} ${currentCarCache.model || ''} (${currentCarCache.car_no || ''})`.trim() : '';
+
+  return `<div class="log-entry" id="carLogEntry_${log.id}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div class="log-meta" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <span><b>${esc(contactedAt)}</b></span>
         <span class="method-tag ${mClass}">${mLabel}</span>
+        ${carInfo ? `<span style="color:#1976d2;font-size:12px;cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();closeModal('contactModal');openDetail('${log.vid}')" title="查看車輛詳情">🚗 ${esc(carInfo)}</span>` : ''}
         ${log.contacted_by ? `<span>聯絡人：<b>${esc(log.contacted_by)}</b></span>` : ''}
       </div>
       <div style="display:flex;gap:4px">
-        <button class="btn btn-sm" style="font-size:11px;padding:2px 8px" onclick="deleteCarLog(${log.id}, '${log.vid}')">刪除</button>
+        <button class="btn btn-sm" style="font-size:11px;padding:2px 8px" onclick="showCarEditLogForm(${log.id}, '${log.vid}')">編輯</button>
+        <button class="btn btn-sm" style="font-size:11px;padding:2px 8px;background:#f44336" onclick="deleteCarLog(${log.id}, '${log.vid}')">刪除</button>
       </div>
     </div>
-    ${log.content ? `<div class="log-content" style="margin-top:8px;color:#555;font-size:13px">${esc(log.content)}</div>` : ''}
+    ${log.content ? `<div class="log-content" style="margin-top:8px">${esc(log.content)}</div>` : ''}
   </div>`;
 }
 
@@ -3444,8 +3522,16 @@ function showCarAddLogForm(vid) {
     { value: 'tracking', label: '待追蹤' },
     { value: 'sold', label: '車輛已售' }
   ].map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+
+  // 從快取取得車輛資訊
+  const carInfo = currentCarCache ? `${currentCarCache.make || ''} ${currentCarCache.model || ''} (${currentCarCache.year || '-'}) - ${currentCarCache.car_no || ''}` : vid;
+
   area.innerHTML = `<div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="form-group" style="margin:0">
+        <label>關聯車輛</label>
+        <input type="text" value="${esc(carInfo)}" readonly style="background:#f5f5f5;cursor:not-allowed;color:#1976d2;font-weight:500">
+      </div>
       <div class="form-group" style="margin:0">
         <label>聯絡時間</label>
         <input type="datetime-local" id="carLogAt_new" value="${now}">
@@ -3495,11 +3581,16 @@ async function saveCarNewLog(vid) {
     intention_status: intentionStatus,
   };
   try {
-    await fetch(`/api/car/${vid}/logs`, {
+    const res = await fetch(`/api/car/${vid}/logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    const result = await res.json();
+    if (!res.ok || result.error) {
+      alert('新增失敗: ' + (result.error || '未知錯誤'));
+      return;
+    }
     if (intentionStatus === 'sold') {
       alert('車輛已標記為已售');
       closeModal('carModal');
@@ -3508,6 +3599,80 @@ async function saveCarNewLog(vid) {
       openDetail(vid);  // 重新載入車輛詳情
     }
   } catch(e) { alert('新增失敗: ' + e.message); }
+}
+
+// 車輛頁面的編輯溝通紀錄表單
+async function showCarEditLogForm(logId, vid) {
+  const entry = document.getElementById(`carLogEntry_${logId}`);
+  if (!entry) return;
+
+  try {
+    const r = await fetch(`/api/car/${vid}`);
+    const car = await r.json();
+    const log = (car.contact_logs || []).find(l => l.id === logId);
+    if (!log) return;
+
+    const at = log.contacted_at ? log.contacted_at.substring(0, 16) : '';
+    const carInfo = `${car.make || ''} ${car.model || ''} (${car.year || '-'}) - ${car.car_no || ''}`;
+    const methodOpts = methodOptions.map(m => `<option value="${m}" ${log.contact_method === m ? 'selected' : ''}>${methodLabels[m]}</option>`).join('');
+    const intentionOpts = [
+      { value: '', label: '-- 未設定 --' },
+      { value: 'willing', label: '有意願' },
+      { value: 'unwilling', label: '無意願' },
+      { value: 'tracking', label: '待追蹤' },
+      { value: 'sold', label: '車輛已售' }
+    ].map(o => `<option value="${o.value}" ${log.intention_status === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    entry.outerHTML = `<div class="log-form" id="carLogEntry_${logId}" style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0">
+          <label>關聯車輛</label>
+          <input type="text" value="${esc(carInfo)}" readonly style="background:#f5f5f5;cursor:not-allowed;color:#1976d2;font-weight:500">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>聯絡時間</label>
+          <input type="datetime-local" id="carLogAt_${logId}" value="${esc(at)}">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>溝通方式</label>
+          <select id="carLogMethod_${logId}">${methodOpts}</select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>意願狀態</label>
+          <select id="carLogIntention_${logId}">${intentionOpts}</select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>誰聯絡的</label>
+        <input type="text" value="${esc(log.contacted_by || '')}" readonly style="background:#f5f5f5;cursor:not-allowed">
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>溝通內容</label>
+        <textarea id="carLogContent_${logId}" style="height:70px">${esc(log.content || '')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="saveCarEditLog(${logId}, '${vid}')">更新</button>
+        <button class="btn btn-sm btn-outline" onclick="openDetail('${vid}')">取消</button>
+      </div>
+    </div>`;
+  } catch(e) { alert('載入失敗: ' + e.message); }
+}
+
+async function saveCarEditLog(logId, vid) {
+  const data = {
+    contact_method: document.getElementById(`carLogMethod_${logId}`).value,
+    content: document.getElementById(`carLogContent_${logId}`).value,
+    contacted_at: document.getElementById(`carLogAt_${logId}`).value,
+    intention_status: document.getElementById(`carLogIntention_${logId}`).value,
+  };
+  try {
+    await fetch(`/api/contact/log/${logId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    openDetail(vid);  // 重新載入車輛詳情
+  } catch(e) { alert('更新失敗: ' + e.message); }
 }
 
 async function deleteCarLog(logId, vid) {
@@ -3601,6 +3766,10 @@ async function loadContacts(page) {
       const intentionLabel = intentionLabels[intentionStatus] || '';
       const intentionColor = intentionColors[intentionStatus] || '#ccc';
 
+      // 展開按鈕（有溝通紀錄時顯示）
+      const expandBtn = logCount > 0 ?
+        `<button class="btn-expand" onclick="event.stopPropagation();toggleContactLogs(${c.group_id})" title="展開溝通紀錄">▶</button>` : '';
+
       html += `<tr class="clickable contact-row" data-group-id="${c.group_id}">
         <td class="td-checkbox" onclick="event.stopPropagation()"><input type="checkbox" class="contact-checkbox" value="${c.group_id}" onchange="updateContactSelection()"></td>
         <td data-label="分類" onclick="openContactDetail(${c.group_id})"><span class="badge ${badgeClass}">${label}</span></td>
@@ -3610,9 +3779,12 @@ async function loadContacts(page) {
         <td data-label="車輛" onclick="openContactDetail(${c.group_id})">${c.active_car_count || 0}</td>
         <td data-label="更新" onclick="openContactDetail(${c.group_id})" style="font-size:12px">${lastUpdate}</td>
         <td data-label="簡訊" onclick="openContactDetail(${c.group_id})">${smsCount > 0 ? `<span style="color:#4CAF50;font-weight:600">${smsCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
-        <td data-label="聯絡" onclick="openContactDetail(${c.group_id})">${logCount > 0 ? `<span style="color:#1a73e8;font-weight:600">${logCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
+        <td data-label="聯絡" onclick="event.stopPropagation()">${expandBtn}${logCount > 0 ? `<span style="color:#1a73e8;font-weight:600">${logCount}</span>` : '<span style="color:#ccc">0</span>'}</td>
         <td data-label="聯絡人" onclick="openContactDetail(${c.group_id})" style="font-size:12px">${c.last_contacted_by ? esc(c.last_contacted_by) : '<span style="color:#ccc">-</span>'}</td>
         <td data-label="最後聯絡" onclick="openContactDetail(${c.group_id})" style="font-size:12px">${c.last_contacted_at ? c.last_contacted_at.substring(0,10) : '-'}</td>
+      </tr>
+      <tr class="contact-logs-row" id="contactLogs_${c.group_id}" style="display:none">
+        <td colspan="11" class="contact-logs-cell"></td>
       </tr>`;
     }
 
@@ -3622,6 +3794,64 @@ async function loadContacts(page) {
   } catch(e) {
     container.innerHTML = '<div class="empty">載入失敗</div>';
     console.error(e);
+  }
+}
+
+// 展開/折疊聯絡人溝通紀錄
+async function toggleContactLogs(groupId) {
+  const row = document.getElementById(`contactLogs_${groupId}`);
+  const btn = document.querySelector(`tr[data-group-id="${groupId}"] .btn-expand`);
+  if (!row) return;
+
+  if (row.style.display === 'none') {
+    // 展開
+    row.style.display = '';
+    if (btn) btn.textContent = '▼';
+    const cell = row.querySelector('td');
+    cell.innerHTML = '<div style="padding:12px;color:#666">載入中...</div>';
+
+    try {
+      const r = await fetch(`/api/contact/${groupId}/logs-summary`);
+      const data = await r.json();
+
+      if (!data.cars || data.cars.length === 0) {
+        cell.innerHTML = '<div style="padding:12px;color:#999">沒有溝通紀錄</div>';
+        return;
+      }
+
+      let html = '<div style="padding:12px">';
+      for (const car of data.cars) {
+        html += `<div class="contact-logs-card">
+          <div style="font-weight:600;margin-bottom:8px" class="car-title">🚗 ${esc(car.car_info)} <span class="car-no">(${car.car_no})</span></div>`;
+        for (const log of car.logs) {
+          const at = log.contacted_at ? log.contacted_at.replace('T', ' ').substring(0, 16) : '';
+          const method = methodLabels[log.contact_method] || log.contact_method || '';
+          const intentionLabels = { willing: '有意願', unwilling: '無意願', tracking: '待追蹤', sold: '已售' };
+          const intentionColors = { willing: '#4CAF50', unwilling: '#f44336', tracking: '#ff9800', sold: '#9e9e9e' };
+          const intention = log.intention_status || '';
+          const intentionHtml = intention ? `<span style="color:${intentionColors[intention]};font-weight:600;font-size:12px">${intentionLabels[intention]}</span>` : '';
+          html += `<div class="contact-log-item">
+            <span class="log-time">${esc(at)}</span>
+            <span class="method-tag m-${log.contact_method || 'other'}" style="font-size:11px;padding:2px 6px">${method}</span>
+            ${intentionHtml}
+            ${log.contacted_by ? `<span class="log-by">by ${esc(log.contacted_by)}</span>` : ''}
+            ${log.content ? `<div class="log-text">${esc(log.content)}</div>` : ''}
+          </div>`;
+        }
+        if (car.log_count > 3) {
+          html += `<div style="font-size:12px;color:#1976d2;padding-top:6px;cursor:pointer" onclick="openContactDetail(${groupId})">... 還有 ${car.log_count - 3} 條紀錄，點擊查看全部</div>`;
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      cell.innerHTML = html;
+    } catch(e) {
+      cell.innerHTML = '<div style="padding:12px;color:#f44336">載入失敗</div>';
+    }
+  } else {
+    // 折疊
+    row.style.display = 'none';
+    if (btn) btn.textContent = '▶';
   }
 }
 
@@ -3852,11 +4082,22 @@ function renderLogEntry(log, intentionStatus) {
 
   const intentionLabels = { willing: '有意願', unwilling: '無意願', tracking: '待追蹤', sold: '車輛已售' };
   const intentionColors = { willing: '#4CAF50', unwilling: '#f44336', tracking: '#ff9800', sold: '#9e9e9e' };
-  const iLabel = intentionLabels[intentionStatus] || '';
-  const iColor = intentionColors[intentionStatus] || '#ccc';
+  // 使用每條紀錄自己的意願狀態，而非聯絡人的整體意願
+  const logIntention = log.intention_status || '';
+  const iLabel = intentionLabels[logIntention] || '';
+  const iColor = intentionColors[logIntention] || '#ccc';
 
   // 顯示關聯車輛資訊（如果有）
-  const carInfo = (log.make || log.model) ? `${log.make || ''} ${log.model || ''}`.trim() : '';
+  let carInfo = '';
+  if (log.make || log.model) {
+    carInfo = `${log.make || ''} ${log.model || ''}`.trim();
+    if (log.car_no) carInfo += ` (${log.car_no})`;
+  }
+
+  // 關聯車輛連結：有 vid 時可點擊開啟車輛詳情
+  const carLink = carInfo && log.vid
+    ? `<span class="car-link" onclick="event.stopPropagation();closeModal('contactModal');openDetail('${log.vid}')" title="查看車輛詳情">🚗 ${esc(carInfo)}</span>`
+    : (carInfo ? `<span class="car-info">🚗 ${esc(carInfo)}</span>` : '');
 
   return `<div class="log-entry" id="logEntry_${log.id}">
     <div class="log-actions">
@@ -3866,7 +4107,7 @@ function renderLogEntry(log, intentionStatus) {
     <div class="log-meta">
       <span><b>${esc(contactedAt)}</b></span>
       <span class="method-tag ${mClass}">${mLabel}</span>
-      ${carInfo ? `<span style="color:#1976d2;font-size:12px">🚗 ${esc(carInfo)}</span>` : ''}
+      ${carLink}
       ${iLabel ? `<span style="color:${iColor};font-weight:600">${iLabel}</span>` : ''}
       ${log.contacted_by ? `<span>聯絡人：<b>${esc(log.contacted_by)}</b></span>` : ''}
     </div>
@@ -3875,7 +4116,7 @@ function renderLogEntry(log, intentionStatus) {
 }
 
 function renderLogForm(opts) {
-  const { id, groupId, contacted_by, contact_method, content, contacted_at, intention_status, isEdit, cars, selectedVid } = opts;
+  const { id, groupId, contacted_by, contact_method, content, contacted_at, intention_status, isEdit, cars, selectedVid, editCarInfo } = opts;
   const now = new Date();
   const defaultAt = contacted_at || now.toISOString().substring(0, 16);
   const methodOpts = methodOptions.map(m =>
@@ -3890,9 +4131,16 @@ function renderLogForm(opts) {
     { value: 'sold', label: '車輛已售' }
   ].map(o => `<option value="${o.value}" ${intention_status === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
 
-  // 車輛選擇（新增時必選）
+  // 車輛選擇/顯示
   let carSelectHtml = '';
-  if (!isEdit && cars && cars.length > 0) {
+  if (isEdit && editCarInfo) {
+    // 編輯模式：顯示關聯車輛（只讀）
+    carSelectHtml = `<div class="form-group" style="margin:0">
+      <label>關聯車輛</label>
+      <input type="text" value="${esc(editCarInfo)}" readonly style="background:#f5f5f5;cursor:not-allowed;color:#1976d2;font-weight:500">
+    </div>`;
+  } else if (!isEdit && cars && cars.length > 0) {
+    // 新增模式：下拉選單
     const carOpts = cars.map(c =>
       `<option value="${c.vid}" ${selectedVid === c.vid ? 'selected' : ''}>${c.make} ${c.model} (${c.year || '-'}) - ${c.car_no}</option>`
     ).join('');
@@ -3902,8 +4150,9 @@ function renderLogForm(opts) {
     </div>`;
   }
 
+  const hasCarField = carSelectHtml !== '';
   return `<div class="log-form" style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:12px">
-    <div style="display:grid;grid-template-columns:${carSelectHtml ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr'};gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:${hasCarField ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr'};gap:10px;margin-bottom:10px">
       ${carSelectHtml}
       <div class="form-group" style="margin:0">
         <label>聯絡時間</label>
@@ -3994,8 +4243,14 @@ async function showEditLogForm(logId, groupId) {
     if (!log) return;
 
     const at = log.contacted_at ? log.contacted_at.substring(0, 16) : '';
-    // 獲取當前聯絡人的意願狀態
-    const currentIntention = detail.intention_status || '';
+    // 獲取該筆紀錄的意願狀態（而非聯絡人的整體意願）
+    const currentIntention = log.intention_status || '';
+    // 組合關聯車輛資訊
+    let editCarInfo = '';
+    if (log.make || log.model) {
+      editCarInfo = `${log.make || ''} ${log.model || ''}`.trim();
+      if (log.car_no) editCarInfo += ` (${log.car_no})`;
+    }
     entry.outerHTML = renderLogForm({
       id: logId, groupId,
       contacted_by: log.contacted_by || '',
@@ -4004,6 +4259,7 @@ async function showEditLogForm(logId, groupId) {
       contacted_at: at,
       intention_status: currentIntention,
       isEdit: true,
+      editCarInfo: editCarInfo,
     });
   } catch(e) { alert('載入失敗'); }
 }
