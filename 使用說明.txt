@@ -2,7 +2,7 @@
   28Car 車輛管理系統 - 使用說明
 ============================================================
 
-【版本】v1.4
+【版本】v1.5
 【日期】2026-02-13
 
 目錄
@@ -13,6 +13,7 @@
 4. 日常操作
 5. 排程設定
 6. 常見問題
+7. 版本更新記錄
 
 ============================================================
 1. 系統簡介
@@ -49,6 +50,9 @@ setup.py                  | Python 安裝腳本（核心）
 檔案名稱                  | 功能說明
 ------------------------------------------------------------
 28car_server.exe          | 伺服器主程式（exe 版本）
+28car_scraper.exe         | 爬蟲程式（exe 版本）
+28car_sms.exe             | 簡訊發送程式（exe 版本）
+28car_backup.exe          | 資料庫備份程式（exe 版本）
 web_demo.py               | 伺服器主程式（Python 版本）
 啟動伺服器.bat            | 手動啟動伺服器
 檢查伺服器狀態.bat        | 檢查伺服器是否運行
@@ -68,6 +72,13 @@ run_daily.py              | 統一執行腳本（可執行全部或單項）
 ------------------------------------------------------------
 migrate_db.py             | 資料庫遷移工具
 build_exe.bat             | 將 Python 程式打包成 exe
+
+【輔助元件】
+------------------------------------------------------------
+檔案名稱                  | 功能說明
+------------------------------------------------------------
+MinGit/                   | 內建 Git 工具（用於遠端更新）
+                          | 不需系統安裝 Git 也可使用更新功能
 
 ============================================================
 3. 部署到新電腦
@@ -117,11 +128,18 @@ build_exe.bat             | 將 Python 程式打包成 exe
 
 【如果需要手動更新資料】
   方法一：網頁管理後台 → 排程管理 → 執行每日爬蟲
-  方法二：執行 python scraper_28car.py --daily
+  方法二：執行 28car_scraper.exe --daily
+        （或 python scraper_28car.py --daily）
 
 【如果需要手動發送簡訊】
   方法一：網頁管理後台 → 排程管理 → 執行每日簡訊
-  方法二：執行 python sms_sender.py --daily --force
+  方法二：執行 28car_sms.exe --daily --force
+        （或 python sms_sender.py --daily --force）
+
+【如果需要手動備份資料庫】
+  方法一：網頁管理後台 → 排程管理 → 執行資料庫備份
+  方法二：執行 28car_backup.exe
+        （或 python backup_db.py）
 
 【網頁上的重啟功能】
   網頁右上角有「重啟」按鈕，可直接在網頁介面重啟伺服器
@@ -149,11 +167,11 @@ build_exe.bat             | 將 Python 程式打包成 exe
 
 【手動建立排程】（如自動安裝失敗）
 
-  以管理員身分執行 CMD：
+  以管理員身分執行 CMD（路徑 請改成實際安裝路徑）：
 
-  schtasks /create /tn "28car_backup" /tr "python 路徑\backup_db.py" /sc daily /st 00:00 /f
-  schtasks /create /tn "28car_daily" /tr "python 路徑\scraper_28car.py --daily --stale-days 14" /sc daily /st 01:00 /f
-  schtasks /create /tn "28car_sms" /tr "python 路徑\sms_sender.py --daily" /sc daily /st 10:00 /f
+  schtasks /create /tn "28car_backup" /tr "路徑\28car_backup.exe" /sc daily /st 00:00 /f
+  schtasks /create /tn "28car_daily" /tr "路徑\28car_scraper.exe --daily --stale-days 14" /sc daily /st 01:00 /f
+  schtasks /create /tn "28car_sms" /tr "路徑\28car_sms.exe --daily" /sc daily /st 10:00 /f
 
 【刪除排程】
 
@@ -183,7 +201,7 @@ A: 執行 python migrate_db.py，會重設為 admin/admin
 
 Q: 爬蟲沒有執行？
 A: 1. 檢查排程是否存在：schtasks /query /tn "28car_daily"
-   2. 手動執行測試：python scraper_28car.py --daily
+   2. 手動執行測試：28car_scraper.exe --daily
    3. 檢查網路連線是否正常
 
 Q: 簡訊發送失敗？
@@ -204,6 +222,36 @@ Q: 如何移除系統？
 A: 1. 執行 python setup.py --uninstall
    2. 或執行「解除安裝.bat」
    3. 手動刪除資料夾（若需完全移除）
+
+Q: 如何遠端更新系統？
+A: 1. 登入管理後台
+   2. 點擊「系統更新」
+   3. 系統會自動檢查並顯示更新內容
+   4. 點擊「立即更新」下載最新版本
+   5. 更新完成後重啟伺服器即可
+
+============================================================
+7. 版本更新記錄
+============================================================
+
+【v1.5】2026-02-13
+  - 新增遠端更新功能（管理後台可直接檢查和下載更新）
+  - 整合 MinGit（不需系統安裝 Git 也可使用更新功能）
+  - exe 模式路徑修正（獨立執行更穩定）
+  - 排程任務改用 exe 執行（不依賴 Python 環境）
+  - 優化首次安裝（使用 shallow clone 加快下載）
+
+【v1.4】2026-02-13
+  - 新增登入系統與權限控制
+  - 新增簡訊發送時間區間設定
+  - 改進已售車輛驗證機制（超過 14 天未出現先驗證詳情頁）
+  - 新增 Inno Setup 安裝程式
+
+【v1.3】2026-02-12
+  - 改進溝通紀錄功能
+  - 新增已售車輛處理邏輯
+  - 新增排程管理介面
+  - 新增同款車輛查價功能
 
 ============================================================
   技術支援

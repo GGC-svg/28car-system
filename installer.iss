@@ -9,7 +9,7 @@
 ;   4. 產生的安裝檔會在 Output 資料夾
 
 #define MyAppName "28Car 車輛管理系統"
-#define MyAppVersion "1.4"
+#define MyAppVersion "1.5"
 #define MyAppPublisher "Car2"
 #define MyAppURL "http://localhost:5000"
 #define MyAppExeName "28car_server.exe"
@@ -160,9 +160,9 @@ Type: dirifempty; Name: "{app}\__pycache__"
 
 [Messages]
 WelcomeLabel1=歡迎使用 28Car 車輛管理系統
-WelcomeLabel2=此程式將安裝 {#MyAppName} v{#MyAppVersion} 到您的電腦。%n%n建議在安裝前關閉所有其他應用程式。%n%n注意：%n1. 圖片資料夾需另外解壓縮到安裝目錄%n2. 如需使用「檢查更新」功能，請先安裝 Git
+WelcomeLabel2=此程式將安裝 {#MyAppName} v{#MyAppVersion} 到您的電腦。%n%n建議在安裝前關閉所有其他應用程式。%n%n注意：圖片資料夾需另外解壓縮到安裝目錄
 FinishedHeadingLabel=安裝完成
-FinishedLabel=28Car 車輛管理系統已成功安裝。%n%n預設帳號：admin%n預設密碼：admin%n（首次登入需更改密碼）%n%n後續步驟：%n1. 解壓縮圖片到：{app}\images\%n2. 安裝 Git（如需更新功能）：https://git-scm.com
+FinishedLabel=28Car 車輛管理系統已成功安裝。%n%n預設帳號：admin%n預設密碼：admin%n（首次登入需更改密碼）%n%n後續步驟：%n解壓縮圖片到：{app}\images\%n%n更新功能已整合 MinGit，無需額外安裝 Git。
 
 [Code]
 // 安裝前檢查

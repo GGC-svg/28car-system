@@ -1881,6 +1881,9 @@ def api_sms_template_update(template_id):
         return jsonify({'error': 'name and content required'}), 400
 
     now = datetime.now().isoformat()
+    # 如果要啟用此模板，先關閉其他模板（確保只有一個啟用）
+    if is_active:
+        db.execute('UPDATE sms_templates SET is_active = 0')
     db.execute('UPDATE sms_templates SET name=?, content=?, is_active=?, updated_at=? WHERE id=?',
                (name, content, is_active, now, template_id))
     db.commit()
@@ -2391,10 +2394,9 @@ def api_admin_network_info():
 def get_git_executable():
     """取得 Git 執行檔路徑，優先使用 MinGit"""
     import shutil
-    script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # 優先使用 MinGit（安裝包內附的）
-    mingit_path = os.path.join(script_dir, 'MinGit', 'cmd', 'git.exe')
+    mingit_path = os.path.join(BASE_DIR, 'MinGit', 'cmd', 'git.exe')
     if os.path.exists(mingit_path):
         return mingit_path
 
@@ -2412,7 +2414,6 @@ def api_admin_check_update():
     """檢查程式更新"""
     import subprocess
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
     git_exe = get_git_executable()
 
     try:
@@ -2421,16 +2422,16 @@ def api_admin_check_update():
             return jsonify({'error': 'Git 未安裝（MinGit 也不存在）', 'has_update': False})
 
         # 檢查是否是 git repo
-        result = subprocess.run([git_exe, 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=script_dir)
+        result = subprocess.run([git_exe, 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=BASE_DIR)
         if result.returncode != 0:
             return jsonify({'error': '此目錄不是 Git 倉庫', 'has_update': False})
 
         # Fetch 遠端更新
-        subprocess.run([git_exe, 'fetch', 'origin'], capture_output=True, text=True, cwd=script_dir)
+        subprocess.run([git_exe, 'fetch', 'origin'], capture_output=True, text=True, cwd=BASE_DIR)
 
         # 取得本地和遠端版本
-        local = subprocess.run([git_exe, 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
-        remote = subprocess.run([git_exe, 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=script_dir).stdout.strip()
+        local = subprocess.run([git_exe, 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=BASE_DIR).stdout.strip()
+        remote = subprocess.run([git_exe, 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=BASE_DIR).stdout.strip()
 
         has_update = local != remote
 
@@ -2439,7 +2440,7 @@ def api_admin_check_update():
         if has_update:
             log_result = subprocess.run(
                 [git_exe, 'log', '--oneline', 'HEAD..origin/main'],
-                capture_output=True, text=True, cwd=script_dir
+                capture_output=True, text=True, cwd=BASE_DIR
             )
             commits = log_result.stdout.strip().split('\n') if log_result.stdout.strip() else []
 
@@ -2460,7 +2461,6 @@ def api_admin_do_update():
     """執行程式更新"""
     import subprocess
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
     git_exe = get_git_executable()
 
     if not git_exe:
@@ -2469,7 +2469,7 @@ def api_admin_do_update():
     try:
         result = subprocess.run(
             [git_exe, 'pull', 'origin', 'main', '--ff-only'],
-            capture_output=True, text=True, cwd=script_dir
+            capture_output=True, text=True, cwd=BASE_DIR
         )
         
         if result.returncode == 0:
