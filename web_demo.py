@@ -46,7 +46,7 @@ SMTP_USER = os.environ.get('SMTP_USER', '')
 SMTP_PASS = os.environ.get('SMTP_PASS', '')
 SMTP_FROM = os.environ.get('SMTP_FROM', '')
 
-app = Flask(__name__, static_folder=BASE_DIR)
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'static'), static_url_path='/static')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
@@ -1331,25 +1331,29 @@ def api_update_contact_log(log_id):
     params.append(log_id)
     db.execute(f"UPDATE contact_logs SET {', '.join(fields)} WHERE id = ?", params)
 
+    # 從資料庫取得該筆紀錄的 vid 和 group_id
+    log_row = db.execute('SELECT vid, group_id FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+    if not log_row:
+        db.close()
+        return jsonify({'error': 'Log not found'}), 404
+    
+    group_id = log_row['group_id']
+    
     # 同步更新 contact_groups 的意願狀態（取該筆紀錄的狀態）
     intention_status = data.get('intention_status', '')
-    group_id = data.get('group_id')
     if intention_status and group_id:
         db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
                    (intention_status, group_id))
 
     # 如果意願狀態為「車輛已售」，同步更新該車輛的 is_sold 狀態
-    if intention_status == 'sold':
-        # 從 contact_logs 取得 vid 和 group_id
-        log_row = db.execute('SELECT vid, group_id FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
-        if log_row and log_row['vid']:
-            db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (log_row['vid'],))
-            # 同步更新 contact_groups 的 active_car_count
-            if log_row['group_id']:
-                db.execute('''UPDATE contact_groups SET 
-                    active_car_count = (SELECT COUNT(*) FROM cars WHERE contact_group_id = ? AND is_sold = 0)
-                    WHERE group_id = ?''', (log_row['group_id'], log_row['group_id']))
-            log.info(f"車輛 {log_row['vid']} 已標記為已售（透過溝通紀錄更新）")
+    if intention_status == 'sold' and log_row['vid']:
+        db.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (log_row['vid'],))
+        # 同步更新 contact_groups 的 active_car_count
+        if group_id:
+            db.execute('''UPDATE contact_groups SET 
+                active_car_count = (SELECT COUNT(*) FROM cars WHERE contact_group_id = ? AND is_sold = 0)
+                WHERE group_id = ?''', (group_id, group_id))
+        log.info(f"車輛 {log_row['vid']} 已標記為已售（透過溝通紀錄更新）")
 
     db.commit()
     db.close()
@@ -1361,7 +1365,26 @@ def api_update_contact_log(log_id):
 def api_delete_contact_log(log_id):
     """刪除溝通紀錄"""
     db = get_db()
+    
+    # 先取得該筆紀錄的 group_id
+    log_row = db.execute('SELECT group_id FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+    group_id = log_row['group_id'] if log_row else None
+    
+    # 刪除紀錄
     db.execute('DELETE FROM contact_logs WHERE id = ?', (log_id,))
+    
+    # 重新計算該聯絡人的意願狀態（取最新一筆紀錄的狀態）
+    if group_id:
+        latest = db.execute(
+            """SELECT intention_status FROM contact_logs 
+               WHERE group_id = ? AND intention_status IS NOT NULL AND intention_status != ''
+               ORDER BY contacted_at DESC, id DESC LIMIT 1""",
+            (group_id,)
+        ).fetchone()
+        new_intention = latest['intention_status'] if latest else None
+        db.execute('UPDATE contact_groups SET intention_status = ? WHERE group_id = ?',
+                   (new_intention, group_id))
+    
     db.commit()
     db.close()
     return jsonify({'status': 'ok'})
