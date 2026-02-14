@@ -81,6 +81,7 @@ installer.iss
 build_exe.bat
 RELEASE_CHECKLIST.md
 SKILL_28car_scraper.md
+SKILL_release.md
 README.md
 打包說明.txt
 run_daily.sh

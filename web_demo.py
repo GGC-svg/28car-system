@@ -1251,6 +1251,11 @@ def api_add_car_contact_log(vid):
     db.commit()
     log_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
     db.close()
+
+    # 記錄操作日誌
+    log_operation(request.current_user['id'], 'ADD_CONTACT_LOG', 'contact_log', str(log_id),
+                  {'vid': vid, 'group_id': group_id, 'method': data.get('contact_method', '')})
+
     return jsonify({'status': 'ok', 'log_id': log_id})
 
 
@@ -1303,6 +1308,11 @@ def api_add_contact_log(group_id):
     db.commit()
     log_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
     db.close()
+
+    # 記錄操作日誌
+    log_operation(request.current_user['id'], 'ADD_CONTACT_LOG', 'contact_log', str(log_id),
+                  {'vid': vid, 'group_id': group_id, 'method': data.get('contact_method', '')})
+
     return jsonify({'status': 'ok', 'log_id': log_id})
 
 
@@ -1313,6 +1323,20 @@ def api_update_contact_log(log_id):
     db = get_db()
     data = request.get_json()
     now = datetime.now().isoformat()
+
+    # 權限檢查：只能編輯自己建立的紀錄（admin 除外）
+    log_check = db.execute('SELECT contacted_by FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+    if not log_check:
+        db.close()
+        return jsonify({'error': 'Log not found'}), 404
+
+    current_user_name = request.current_user.get('display_name') or request.current_user.get('username')
+    is_admin = request.current_user.get('role') == 'admin'
+    is_owner = log_check['contacted_by'] == current_user_name
+
+    if not is_admin and not is_owner:
+        db.close()
+        return jsonify({'error': '只能編輯自己建立的溝通紀錄'}), 403
 
     fields = []
     params = []
@@ -1357,6 +1381,11 @@ def api_update_contact_log(log_id):
 
     db.commit()
     db.close()
+
+    # 記錄操作日誌
+    log_operation(request.current_user['id'], 'UPDATE_CONTACT_LOG', 'contact_log', str(log_id),
+                  {'group_id': group_id, 'fields': list(data.keys())})
+
     return jsonify({'status': 'ok'})
 
 
@@ -1365,11 +1394,24 @@ def api_update_contact_log(log_id):
 def api_delete_contact_log(log_id):
     """刪除溝通紀錄"""
     db = get_db()
-    
-    # 先取得該筆紀錄的 group_id
-    log_row = db.execute('SELECT group_id FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
-    group_id = log_row['group_id'] if log_row else None
-    
+
+    # 先取得該筆紀錄的 group_id 和 contacted_by
+    log_row = db.execute('SELECT group_id, contacted_by FROM contact_logs WHERE id = ?', (log_id,)).fetchone()
+    if not log_row:
+        db.close()
+        return jsonify({'error': 'Log not found'}), 404
+
+    group_id = log_row['group_id']
+
+    # 權限檢查：只能刪除自己建立的紀錄（admin 除外）
+    current_user_name = request.current_user.get('display_name') or request.current_user.get('username')
+    is_admin = request.current_user.get('role') == 'admin'
+    is_owner = log_row['contacted_by'] == current_user_name
+
+    if not is_admin and not is_owner:
+        db.close()
+        return jsonify({'error': '只能刪除自己建立的溝通紀錄'}), 403
+
     # 刪除紀錄
     db.execute('DELETE FROM contact_logs WHERE id = ?', (log_id,))
     
@@ -1387,6 +1429,11 @@ def api_delete_contact_log(log_id):
     
     db.commit()
     db.close()
+
+    # 記錄操作日誌
+    log_operation(request.current_user['id'], 'DELETE_CONTACT_LOG', 'contact_log', str(log_id),
+                  {'group_id': group_id})
+
     return jsonify({'status': 'ok'})
 
 
@@ -2447,6 +2494,33 @@ def api_admin_logs():
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page
     })
+
+
+@app.route('/api/admin/logs/clear', methods=['POST'])
+@admin_required
+def api_admin_clear_logs():
+    """清理操作日誌"""
+    data = request.get_json() or {}
+    days = int(data.get('days', 30))  # 預設保留 30 天
+
+    db = get_db()
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+    # 統計要刪除的數量
+    count = db.execute('SELECT COUNT(*) FROM operation_logs WHERE created_at < ?', (cutoff,)).fetchone()[0]
+
+    if count > 0:
+        db.execute('DELETE FROM operation_logs WHERE created_at < ?', (cutoff,))
+        db.commit()
+
+    db.close()
+
+    # 記錄清理操作
+    log_operation(request.current_user['id'], 'CLEAR_LOGS', 'operation_logs', None,
+                  {'days': days, 'deleted_count': count})
+
+    return jsonify({'status': 'ok', 'deleted': count, 'kept_days': days})
 
 
 @app.route('/api/admin/settings')

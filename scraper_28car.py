@@ -738,6 +738,21 @@ class Scraper28Car:
         conn.commit()
         log_id = c.lastrowid
 
+        # 清理卡住的舊記錄（超過 6 小時還是 running 的）
+        c.execute('''
+            UPDATE scraper_runs
+            SET status = 'cancelled',
+                finished_at = ?,
+                error_message = '任務被中斷或異常終止（自動清理）'
+            WHERE status = 'running'
+              AND finished_at IS NULL
+              AND datetime(started_at) < datetime(?, '-6 hours')
+        ''', (now, now))
+        cleaned = c.rowcount
+        if cleaned > 0:
+            log.info(f"已清理 {cleaned} 筆卡住的舊執行記錄")
+            conn.commit()
+
         # 建立 scraper_runs 記錄
         sources_str = ','.join(sources)
         c.execute('INSERT INTO scraper_runs (started_at, status, sources) VALUES (?, ?, ?)',
