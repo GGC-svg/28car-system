@@ -25,6 +25,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
+import cloudscraper  # Cloudflare 繞過
 import re
 import time
 import random
@@ -267,19 +268,20 @@ def init_db():
 # ============================================================
 class Scraper28Car:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update(HEADERS)
-        # 自動 retry（連線錯誤、超時、5xx）
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[500, 502, 503, 504],
+        # 使用 cloudscraper 繞過 Cloudflare 保護
+        self.session = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'desktop': True,
+            }
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
+        self.session.headers.update(HEADERS)
         os.makedirs(IMAGES_DIR, exist_ok=True)
         self._shutdown = False
+        # 失敗重試隊列
+        self._failed_queue = []  # [(vid, source, retry_count), ...]
+        self._max_retries = 3  # 最大重試次數
 
     def handle_shutdown(self, signum, frame):
         """優雅關閉：收到 SIGINT/SIGTERM 時完成當前任務後停止"""
@@ -1346,6 +1348,7 @@ class Scraper28Car:
         detail_count = 0
         photo_total = 0
         consecutive_failures = 0  # 連續失敗計數
+        failed_items = []  # 失敗項目隊列 [(vid, car_no, has_photo, source), ...]
 
         for i, row in enumerate(pending):
             vid, car_no, has_photo = row[0], row[1], row[2]
@@ -1358,7 +1361,8 @@ class Scraper28Car:
             detail = self.scrape_detail(vid, source)
             if not detail:
                 consecutive_failures += 1
-                log.warning(f"    詳情頁爬取失敗，跳過 (連續失敗: {consecutive_failures})")
+                log.warning(f"    詳情頁爬取失敗，加入重試隊列 (連續失敗: {consecutive_failures})")
+                failed_items.append((vid, car_no, has_photo, source))
                 # 連續失敗時增加等待時間，避免被限流
                 if consecutive_failures >= 3:
                     wait_time = min(consecutive_failures * 10, 60)  # 最多等 60 秒
@@ -1384,7 +1388,86 @@ class Scraper28Car:
 
             detail_count += 1
 
+        # 處理失敗重試隊列
+        if failed_items:
+            retry_success, retry_photos = self._retry_failed_details(
+                conn, failed_items, download_images
+            )
+            detail_count += retry_success
+            photo_total += retry_photos
+
         log.info(f"詳情頁完成: {detail_count} 輛, {photo_total} 張圖片")
+        return detail_count, photo_total
+
+    def _retry_failed_details(self, conn, failed_items, download_images=True):
+        """
+        重試失敗的詳情頁抓取
+        最多重試 3 輪，每輪之間等待時間遞增
+        """
+        if not failed_items:
+            return 0, 0
+
+        detail_count = 0
+        photo_total = 0
+        retry_queue = list(failed_items)
+
+        for retry_round in range(1, self._max_retries + 1):
+            if not retry_queue:
+                break
+
+            log.info(f"")
+            log.info(f"=== 重試第 {retry_round}/{self._max_retries} 輪，共 {len(retry_queue)} 筆 ===")
+
+            # 每輪重試前等待，時間遞增
+            wait_time = retry_round * 30  # 30秒, 60秒, 90秒
+            log.info(f"等待 {wait_time} 秒後開始重試...")
+            time.sleep(wait_time)
+
+            still_failed = []
+
+            for i, (vid, car_no, has_photo, source) in enumerate(retry_queue):
+                src_tag = f"[{source}]" if source != 'sell' else ""
+                log.info(f"  [重試 {i+1}/{len(retry_queue)}] {src_tag} vid={vid} ({car_no})")
+                self._delay(DETAIL_DELAY_MIN + 1, DETAIL_DELAY_MAX + 2)  # 重試時延遲更長
+
+                detail = self.scrape_detail(vid, source)
+                if not detail:
+                    log.warning(f"    重試失敗")
+                    still_failed.append((vid, car_no, has_photo, source))
+                    continue
+
+                log.info(f"    重試成功!")
+                self._save_detail_to_db(conn, vid, detail)
+
+                # 下載圖片
+                if download_images and detail.get('photo_count', 0) > 0:
+                    results = self.download_photos(
+                        vid, car_no or vid,
+                        detail.get('photo_urls', []),
+                        detail.get('photo_urls_fallback', []),
+                        detail.get('photo_urls_medium', []),
+                    )
+                    self._save_photos_to_db(conn, vid, results)
+                    downloaded = sum(1 for r in results if r[3])
+                    photo_total += downloaded
+                    log.info(f"    圖片 {downloaded}/{len(results)} 張")
+
+                detail_count += 1
+
+            retry_queue = still_failed
+
+            if retry_queue:
+                log.info(f"第 {retry_round} 輪完成，仍有 {len(retry_queue)} 筆失敗")
+            else:
+                log.info(f"第 {retry_round} 輪完成，所有重試都成功!")
+
+        if retry_queue:
+            log.warning(f"重試結束，仍有 {len(retry_queue)} 筆無法抓取:")
+            for vid, car_no, _, source in retry_queue[:10]:  # 最多顯示 10 筆
+                log.warning(f"  - {source}/{vid} ({car_no})")
+            if len(retry_queue) > 10:
+                log.warning(f"  ... 還有 {len(retry_queue) - 10} 筆")
+
         return detail_count, photo_total
 
     def _save_detail_to_db(self, conn, vid, detail):
