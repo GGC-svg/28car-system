@@ -114,18 +114,31 @@ CATEGORIES = {
     5: '經典車',
 }
 
+# 多個 User-Agent 隨機輪換，模擬不同瀏覽器
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+]
+
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'zh-TW,zh-HK;q=0.9,zh;q=0.8,en;q=0.6',
-    'Referer': f'{BASE_URL}/',
+    'User-Agent': random.choice(USER_AGENTS),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'zh-TW,zh-HK;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Cache-Control': 'max-age=0',
 }
 
 # 延遲設定（秒）
-PAGE_DELAY_MIN = 1.5
-PAGE_DELAY_MAX = 3.0
-DETAIL_DELAY_MIN = 1.0
-DETAIL_DELAY_MAX = 2.0
+PAGE_DELAY_MIN = 2.0
+PAGE_DELAY_MAX = 4.0
+DETAIL_DELAY_MIN = 2.0
+DETAIL_DELAY_MAX = 4.0
 
 # ============================================================
 # 日誌設定（RotatingFileHandler 防止 log 無限增長）
@@ -273,15 +286,24 @@ class Scraper28Car:
         log.info(f"收到停止信號 ({signum})，將在當前任務完成後停止...")
         self._shutdown = True
 
-    def _fetch(self, url, timeout=15):
+    def _random_headers(self, referer=None):
+        """生成隨機 headers 模擬真實瀏覽器"""
+        return {
+            'User-Agent': random.choice(USER_AGENTS),
+            'Referer': referer or f'{BASE_URL}/',
+        }
+
+    def _fetch(self, url, timeout=30, referer=None):
         """抓取頁面，Big5 解碼（自動 retry by session adapter）"""
-        resp = self.session.get(url, timeout=timeout)
+        headers = self._random_headers(referer)
+        resp = self.session.get(url, timeout=timeout, headers=headers)
         resp.raise_for_status()
         return resp.content.decode('big5', errors='replace')
 
-    def _fetch_bytes(self, url, timeout=15):
+    def _fetch_bytes(self, url, timeout=30, referer=None):
         """抓取二進位內容（圖片用）"""
-        resp = self.session.get(url, timeout=timeout)
+        headers = self._random_headers(referer)
+        resp = self.session.get(url, timeout=timeout, headers=headers)
         resp.raise_for_status()
         return resp.content
 
@@ -490,8 +512,11 @@ class Scraper28Car:
         注意：sell_dsp.php / cmy_dsp.php 會回傳 frameset，必須用 index2.php 包裝
         """
         url = self._detail_url(source, vid)
+        # 使用列表頁作為 Referer，模擬正常瀏覽行為
+        list_page = SOURCES[source]['list_page']
+        referer = f"{BASE_URL}/{list_page}"
         try:
-            text = self._fetch(url)
+            text = self._fetch(url, referer=referer)
         except Exception as e:
             log.error(f"詳情頁抓取失敗 vid={vid} source={source}: {e}")
             return None
@@ -1320,6 +1345,7 @@ class Scraper28Car:
         log.info(f"需爬取 {len(pending)} 輛車的詳情頁")
         detail_count = 0
         photo_total = 0
+        consecutive_failures = 0  # 連續失敗計數
 
         for i, row in enumerate(pending):
             vid, car_no, has_photo = row[0], row[1], row[2]
@@ -1331,10 +1357,17 @@ class Scraper28Car:
 
             detail = self.scrape_detail(vid, source)
             if not detail:
-                log.warning(f"    詳情頁爬取失敗，跳過")
+                consecutive_failures += 1
+                log.warning(f"    詳情頁爬取失敗，跳過 (連續失敗: {consecutive_failures})")
+                # 連續失敗時增加等待時間，避免被限流
+                if consecutive_failures >= 3:
+                    wait_time = min(consecutive_failures * 10, 60)  # 最多等 60 秒
+                    log.info(f"    連續失敗 {consecutive_failures} 次，等待 {wait_time} 秒...")
+                    time.sleep(wait_time)
                 continue
 
             self._save_detail_to_db(conn, vid, detail)
+            consecutive_failures = 0  # 成功時重置計數
 
             # 下載圖片
             if download_images and detail.get('photo_count', 0) > 0:
