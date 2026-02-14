@@ -9,7 +9,7 @@
 ;   4. 產生的安裝檔會在 Output 資料夾
 
 #define MyAppName "28Car 車輛管理系統"
-#define MyAppVersion "1.5.1"
+#define MyAppVersion "1.5.3"
 #define MyAppPublisher "Car2"
 #define MyAppURL "http://localhost:5000"
 #define MyAppExeName "28car_server.exe"
