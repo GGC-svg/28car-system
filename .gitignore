@@ -82,6 +82,9 @@ build_exe.bat
 RELEASE_CHECKLIST.md
 SKILL_28car_scraper.md
 README.md
+打包說明.txt
+run_daily.sh
+start_server.bat
 
 # 測試圖片
 01.png
