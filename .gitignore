@@ -77,6 +77,11 @@ tmpclaude-*
 # 開發用腳本（不需要給用戶）
 download_dependencies.py
 download_mingit.bat
+installer.iss
+build_exe.bat
+RELEASE_CHECKLIST.md
+SKILL_28car_scraper.md
+README.md
 
 # 測試圖片
 01.png
