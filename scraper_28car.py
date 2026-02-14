@@ -83,6 +83,7 @@ def normalize_updated_at(raw_time):
 # ============================================================
 BASE_DIR = os.environ.get('APP_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
 BASE_URL = os.environ.get('APP_BASE_URL', "https://www.28car.com")
+CDN_URL = os.environ.get('APP_CDN_URL', "https://dj1jklak2e.28car.com")  # 詳情頁內容 CDN
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
 IMAGES_DIR = os.environ.get('IMAGES_DIR', os.path.join(BASE_DIR, "images"))
 LOG_PATH = os.environ.get('LOG_PATH', os.path.join(BASE_DIR, "scraper.log"))
@@ -304,9 +305,9 @@ class Scraper28Car:
             return f"{BASE_URL}/index2.php?tourl=%2F{list_page}%3Fh_page%3D{page}"
 
     def _detail_url(self, source, vid):
-        """建構詳情頁 URL（支援 sell / cmy）"""
+        """建構詳情頁 URL（支援 sell / cmy）- 直接使用 CDN"""
         detail_page = SOURCES[source]['detail_page']
-        return f"{BASE_URL}/index2.php?tourl=%2F{detail_page}%3Fh_vid%3D{vid}%26h_vw%3D1"
+        return f"{CDN_URL}/{detail_page}?h_vid={vid}&h_vw=1"
 
     # ============================================================
     # 列表頁解析
@@ -400,9 +401,9 @@ class Scraper28Car:
             raw_time = time_td.get_text(strip=True) if time_td else ''
             car['updated_at'] = normalize_updated_at(raw_time)
 
-            # 詳情頁 URL
+            # 詳情頁 URL（使用 CDN）
             detail_page = SOURCES[source]['detail_page']
-            car['detail_url'] = f"{BASE_URL}/{detail_page}?h_vid={car['vid']}&h_vw=1"
+            car['detail_url'] = f"{CDN_URL}/{detail_page}?h_vid={car['vid']}&h_vw=1"
 
             return car
         except Exception as e:
