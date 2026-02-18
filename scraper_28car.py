@@ -82,7 +82,14 @@ def normalize_updated_at(raw_time):
 # ============================================================
 # 設定（支援環境變數覆蓋，方便 server 部署）
 # ============================================================
-BASE_DIR = os.environ.get('APP_BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+# PyInstaller 打包後，__file__ 會指向臨時目錄，需要用 sys.executable 取得 exe 所在目錄
+if getattr(sys, 'frozen', False):
+    # 打包成 exe 執行
+    _default_base = os.path.dirname(sys.executable)
+else:
+    # Python 腳本執行
+    _default_base = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 BASE_URL = os.environ.get('APP_BASE_URL', "https://www.28car.com")
 CDN_URL = os.environ.get('APP_CDN_URL', "https://dj1jklak2e.28car.com")  # 詳情頁內容 CDN
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))

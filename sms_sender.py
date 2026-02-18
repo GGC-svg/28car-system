@@ -30,7 +30,11 @@ from datetime import datetime, date
 # 設定
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller 打包後，__file__ 會指向臨時目錄，需要用 sys.executable 取得 exe 所在目錄
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "cars_28car.db")
 CONFIG_PATH = os.path.join(BASE_DIR, "sms_config.json")
 

@@ -5,11 +5,16 @@
 """
 
 import os
+import sys
 import shutil
 from datetime import datetime
 
 # 路徑設定
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller 打包後，__file__ 會指向臨時目錄，需要用 sys.executable 取得 exe 所在目錄
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, 'cars_28car.db')
 BACKUP_DIR = os.path.join(BASE_DIR, 'backup')
 BACKUP_FILE = os.path.join(BACKUP_DIR, 'cars_28car_backup.db')
@@ -70,4 +75,4 @@ def trim_log():
 if __name__ == '__main__':
     success = backup()
     trim_log()
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)
