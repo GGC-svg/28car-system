@@ -95,6 +95,7 @@ start_server.bat
 # Claude 設定
 .claude/
 CLAUDE.md
+.agent/
 
 # msgAPI（外部資料）
 msgAPI/
