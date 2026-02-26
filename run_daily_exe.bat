@@ -39,7 +39,7 @@ echo.
 echo [1/2] 執行每日爬蟲...
 echo [%date% %time%] 開始執行爬蟲 >> "%LOG_FILE%"
 
-28car_scraper.exe --daily --stale-days 7
+"%~dp028car_scraper.exe" --daily --stale-days 7
 set SCRAPER_RESULT=%errorlevel%
 
 if %SCRAPER_RESULT%==0 (
@@ -50,9 +50,9 @@ if %SCRAPER_RESULT%==0 (
 
 echo.
 echo [2/2] 執行每日簡訊發送...
-if exist "28car_sms.exe" (
+if exist "%~dp028car_sms.exe" (
     echo [%date% %time%] 開始執行簡訊發送 >> "%LOG_FILE%"
-    28car_sms.exe --daily
+    "%~dp028car_sms.exe" --daily
     if %errorlevel%==0 (
         echo [%date% %time%] 簡訊發送完成 >> "%LOG_FILE%"
     ) else (
