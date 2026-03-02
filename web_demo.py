@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.14"
+APP_VERSION = "1.5.15"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))

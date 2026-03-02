@@ -750,7 +750,7 @@ class Scraper28Car:
     # ============================================================
     # 智能每日更新
     # ============================================================
-    def run_daily_update(self, stale_days=7, download_images=True, sources=None):
+    def run_daily_update(self, stale_days=0, download_images=True, sources=None):
         """
         智能每日更新：
         - 逐一掃描指定的來源系統（sell + cmy）
@@ -759,7 +759,9 @@ class Scraper28Car:
         - 已知 VID 但 updated_at 變了 → UPDATE + 重爬詳情
         - 已知 VID 且 updated_at 沒變 → 跳過
         - 連續整頁全部沒變化 → 停止掃描（後面都是更舊的）
-        - 超過 stale_days 天沒出現 → 標記可能下架
+
+        注意：每日更新只掃描前幾頁，不適合標記下架車輛。
+        若要標記下架，請用週末全量掃描 + --stale-days 7
         """
         if sources is None:
             sources = ['sell', 'cmy']
@@ -840,7 +842,7 @@ class Scraper28Car:
             stats['details_scraped'] = detail_count
             stats['photos_downloaded'] = photo_count
 
-            # === 步驟 3: 標記可能下架的車輛 ===
+            # === 步驟 3: 標記可能下架的車輛（僅在全量掃描時有意義）===
             if stale_days > 0:
                 log.info("")
                 log.info(f"步驟 3: 標記超過 {stale_days} 天未出現的車輛")
@@ -1065,55 +1067,45 @@ class Scraper28Car:
         return new_count, updated_count, unchanged_count
 
     def _mark_stale_cars(self, conn, stale_days):
-        """標記超過 N 天沒出現在列表的車輛為已下架（驗證詳情頁後才標記）"""
+        """
+        標記超過 N 天沒出現在列表的車輛為已下架
+
+        原理：
+        - 28car 按更新時間排序，有更新的車會排到前面
+        - 全量掃描時，所有在售車輛都會被掃到，last_seen 會更新
+        - 如果 last_seen 超過 N 天沒更新，表示全量掃描時沒看到這輛車
+        - 極大概率已下架或已售，直接標記
+
+        注意：此功能只在「全量掃描」後才有意義。
+        每日更新只掃前幾頁，不應使用此功能（--stale-days 0）。
+        """
         c = conn.cursor()
 
-        # 1. 先查詢可能要標記的車輛
+        # 查詢超過 N 天未出現的車輛數量
         c.execute('''
-            SELECT vid, source FROM cars
+            SELECT COUNT(*) FROM cars
             WHERE is_sold = 0
               AND last_seen < datetime('now', ? || ' days')
         ''', (f'-{stale_days}',))
+        total = c.fetchone()[0]
 
-        candidates = c.fetchall()
-
-        if not candidates:
+        if total == 0:
             log.info(f"  無需標記下架車輛")
             return 0
 
-        log.info(f"  發現 {len(candidates)} 輛車超過 {stale_days} 天未出現，開始驗證詳情頁...")
+        log.info(f"  發現 {total} 輛車超過 {stale_days} 天未出現在列表")
+        log.info(f"  直接標記為已售（全量掃描後未出現 = 已下架）")
 
-        marked_count = 0
-        still_active = 0
-        now = datetime.now().isoformat()
-
-        for vid, source in candidates:
-            # 2. 驗證詳情頁是否還存在
-            try:
-                self._delay(0.5, 1.0)  # 短暫延遲避免被封
-                url = self._detail_url(source, vid)
-                text = self._fetch(url)
-
-                # 檢查是否有「已售」或頁面內容表示已下架
-                if '已售' in text or '此車輛已下架' in text or '找不到此車輛' in text:
-                    c.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
-                    marked_count += 1
-                    log.info(f"    [已售] vid={vid}")
-                else:
-                    # 車輛還在，更新 last_seen
-                    c.execute('UPDATE cars SET last_seen = ? WHERE vid = ?', (now, vid))
-                    still_active += 1
-                    log.info(f"    [仍在] vid={vid}，更新 last_seen")
-
-            except Exception as e:
-                # 頁面不存在或抓取失敗，標記為已售
-                c.execute('UPDATE cars SET is_sold = 1 WHERE vid = ?', (vid,))
-                marked_count += 1
-                log.info(f"    [下架] vid={vid} (頁面無法存取: {e})")
-
+        # 直接批量標記
+        c.execute('''
+            UPDATE cars SET is_sold = 1
+            WHERE is_sold = 0
+              AND last_seen < datetime('now', ? || ' days')
+        ''', (f'-{stale_days}',))
         conn.commit()
-        log.info(f"  驗證完成: {marked_count} 輛已下架, {still_active} 輛仍在售")
-        return marked_count
+
+        log.info(f"  已標記 {total} 輛車為已售")
+        return total
 
     # ============================================================
     # 完整爬取流程
@@ -1693,8 +1685,8 @@ def main():
                         help='只做 JSON 匯出（不爬取）')
     parser.add_argument('--daily', action='store_true',
                         help='每日智能更新模式（只掃描有變化的頁面）')
-    parser.add_argument('--stale-days', type=int, default=14,
-                        help='超過幾天沒出現標記為下架 (預設=14)')
+    parser.add_argument('--stale-days', type=int, default=0,
+                        help='超過幾天沒出現標記為下架 (預設=0，不標記；週末全量掃描時可設 7)')
     parser.add_argument('--source', type=str, default='all',
                         choices=['sell', 'cmy', 'all'],
                         help='爬取來源: sell=私人, cmy=車行, all=全部 (預設=all)')
