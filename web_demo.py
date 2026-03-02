@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.12"
+APP_VERSION = "1.5.13"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -124,9 +124,9 @@ def get_script_command(script_name, args=None):
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -156,18 +156,29 @@ def verify_password(password, stored_hash):
 
 
 def create_session(user_id, ip_address, user_agent):
-    """建立 Session"""
-    db = get_db()
+    """建立 Session（含重試機制）"""
+    import time
     session_id = str(uuid.uuid4())
     now = datetime.now()
     expires_at = (now + timedelta(hours=SESSION_EXPIRE_HOURS)).isoformat()
 
-    db.execute("""
-        INSERT INTO sessions (session_id, user_id, ip_address, user_agent, created_at, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (session_id, user_id, ip_address, user_agent, now.isoformat(), expires_at))
-    db.commit()
-    db.close()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            db = get_db()
+            db.execute("""
+                INSERT INTO sessions (session_id, user_id, ip_address, user_agent, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (session_id, user_id, ip_address, user_agent, now.isoformat(), expires_at))
+            db.commit()
+            db.close()
+            return session_id
+        except sqlite3.OperationalError as e:
+            if 'locked' in str(e) and attempt < max_retries - 1:
+                log.warning(f'資料庫鎖定，重試 {attempt + 1}/{max_retries}...')
+                time.sleep(1)
+                continue
+            raise
     return session_id
 
 
@@ -2650,7 +2661,7 @@ def api_admin_check_update():
         req = urllib.request.Request(url, headers={'User-Agent': '28car-system'})
 
         try:
-            with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
                 data = json.loads(response.read().decode('utf-8'))
         except urllib.error.HTTPError as e:
             if e.code == 404:
