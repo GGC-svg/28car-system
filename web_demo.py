@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.10"
+APP_VERSION = "1.5.11"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -3091,4 +3091,4 @@ if __name__ == '__main__':
     print("  28car Demo 網站")
     print(f"  http://localhost:{FLASK_PORT}")
     print("=" * 50)
-    app.run(host=FLASK_HOST, port=FLASK_PORT, debug=FLASK_DEBUG)
+    app.run(host=FLASK_HOST, port=FLASK_PORT, debug=FLASK_DEBUG, threaded=True)
