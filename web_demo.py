@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.9"
+APP_VERSION = "1.5.10"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -240,53 +240,57 @@ def restricted_api(f):
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
     """登入"""
-    data = request.get_json()
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
+    try:
+        data = request.get_json(silent=True) or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
 
-    if not username or not password:
-        return jsonify({'error': '請輸入帳號密碼'}), 400
+        if not username or not password:
+            return jsonify({'error': '請輸入帳號密碼'}), 400
 
-    db = get_db()
-    user = db.execute(
-        'SELECT * FROM users WHERE username = ? AND is_active = 1',
-        (username,)
-    ).fetchone()
-    db.close()
+        db = get_db()
+        user = db.execute(
+            'SELECT * FROM users WHERE username = ? AND is_active = 1',
+            (username,)
+        ).fetchone()
+        db.close()
 
-    if not user or not verify_password(password, user['password_hash']):
-        log_operation(None, 'LOGIN_FAILED', 'user', username, {'reason': 'invalid_credentials'})
-        return jsonify({'error': '帳號或密碼錯誤'}), 401
+        if not user or not verify_password(password, user['password_hash']):
+            log_operation(None, 'LOGIN_FAILED', 'user', username, {'reason': 'invalid_credentials'})
+            return jsonify({'error': '帳號或密碼錯誤'}), 401
 
-    session_id = create_session(
-        user['id'],
-        request.remote_addr,
-        request.headers.get('User-Agent', '')
-    )
+        session_id = create_session(
+            user['id'],
+            request.remote_addr,
+            request.headers.get('User-Agent', '')
+        )
 
-    # 更新最後登入時間
-    db = get_db()
-    db.execute('UPDATE users SET last_login_at = ? WHERE id = ?',
-               (datetime.now().isoformat(), user['id']))
-    db.commit()
-    db.close()
+        # 更新最後登入時間
+        db = get_db()
+        db.execute('UPDATE users SET last_login_at = ? WHERE id = ?',
+                   (datetime.now().isoformat(), user['id']))
+        db.commit()
+        db.close()
 
-    log_operation(user['id'], 'LOGIN', 'user', str(user['id']), {})
+        log_operation(user['id'], 'LOGIN', 'user', str(user['id']), {})
 
-    resp = make_response(jsonify({
-        'success': True,
-        'user': {
-            'id': user['id'],
-            'username': user['username'],
-            'display_name': user['display_name'],
-            'role': user['role'],
-            'must_change_pwd': user['must_change_pwd']
-        }
-    }))
-    resp.set_cookie(SESSION_COOKIE_NAME, session_id,
-                    max_age=SESSION_EXPIRE_HOURS * 3600,
-                    httponly=True, samesite='Lax')
-    return resp
+        resp = make_response(jsonify({
+            'success': True,
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'display_name': user['display_name'],
+                'role': user['role'],
+                'must_change_pwd': user['must_change_pwd']
+            }
+        }))
+        resp.set_cookie(SESSION_COOKIE_NAME, session_id,
+                        max_age=SESSION_EXPIRE_HOURS * 3600,
+                        httponly=True, samesite='Lax')
+        return resp
+    except Exception as e:
+        log.error(f'登入處理錯誤: {e}')
+        return jsonify({'error': '伺服器處理錯誤，請稍後再試'}), 500
 
 
 @app.route('/api/auth/logout', methods=['POST'])
