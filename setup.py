@@ -139,14 +139,14 @@ def setup_scheduled_tasks():
         # EXE 版本 - 直接執行 exe
         tasks = [
             ('28car_backup', '00:00', os.path.join(BASE_DIR, '28car_backup.exe'), '每日備份', 'exe'),
-            ('28car_daily', '01:00', os.path.join(BASE_DIR, '28car_scraper.exe') + '" --daily --stale-days 14', '每日爬蟲', 'exe_args'),
+            ('28car_daily', '01:00', os.path.join(BASE_DIR, '28car_scraper.exe') + '" --daily', '每日爬蟲', 'exe_args'),
             ('28car_sms', '10:00', os.path.join(BASE_DIR, '28car_sms.exe') + '" --daily', '每日簡訊', 'exe_args'),
         ]
     else:
         # Python 版本
         tasks = [
             ('28car_backup', '00:00', os.path.join(BASE_DIR, 'backup_db.py'), '每日備份', 'py'),
-            ('28car_daily', '01:00', os.path.join(BASE_DIR, 'scraper_28car.py') + '" --daily --stale-days 14', '每日爬蟲', 'py_args'),
+            ('28car_daily', '01:00', os.path.join(BASE_DIR, 'scraper_28car.py') + '" --daily', '每日爬蟲', 'py_args'),
             ('28car_sms', '10:00', os.path.join(BASE_DIR, 'sms_sender.py') + '" --daily', '每日簡訊', 'py_args'),
         ]
 

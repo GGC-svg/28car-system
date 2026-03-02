@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.15"
+APP_VERSION = "1.5.16"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -88,7 +88,7 @@ def get_script_command(script_name, args=None):
     """
     取得執行腳本的命令，自動判斷使用 exe 或 python
     script_name: 'scraper', 'sms', 'backup'
-    args: 額外參數列表，例如 ['--daily', '--stale-days', '14']
+    args: 額外參數列表，例如 ['--daily']
     返回: 命令列表，例如 ['28car_scraper.exe', '--daily'] 或 ['python', 'scraper_28car.py', '--daily']
     """
     import subprocess
@@ -2877,7 +2877,7 @@ def api_admin_update_schedule():
 
     # 取得執行命令（優先 exe，其次 py）
     if schedule_type == 'scraper':
-        cmd = get_script_command('scraper', ['--daily', '--stale-days', '14'])
+        cmd = get_script_command('scraper', ['--daily'])
     elif schedule_type == 'sms':
         cmd = get_script_command('sms', ['--daily'])
     else:
@@ -2920,7 +2920,7 @@ def api_admin_run_daily_scraper():
 
     daily_log_path = os.path.join(BASE_DIR, 'daily_task.log')
 
-    cmd = get_script_command('scraper', ['--daily', '--stale-days', '14'])
+    cmd = get_script_command('scraper', ['--daily'])
     if not cmd:
         return jsonify({'success': False, 'error': '找不到爬蟲程式 (exe 或 py)'})
 

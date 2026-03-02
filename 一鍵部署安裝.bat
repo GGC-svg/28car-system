@@ -124,9 +124,9 @@ if %errorlevel%==0 (
 
 :: 建立爬蟲排程（每天 01:00）
 if exist "%SCRIPT_DIR%\28car_scraper.exe" (
-    schtasks /create /tn "28car_daily" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --daily --stale-days 14" /sc daily /st 01:00 /f >nul 2>&1
+    schtasks /create /tn "28car_daily" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --daily" /sc daily /st 01:00 /f >nul 2>&1
 ) else (
-    schtasks /create /tn "28car_daily" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --daily --stale-days 14" /sc daily /st 01:00 /f >nul 2>&1
+    schtasks /create /tn "28car_daily" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --daily" /sc daily /st 01:00 /f >nul 2>&1
 )
 if %errorlevel%==0 (
     echo [OK] 28car_daily - 每天 01:00 自動執行爬蟲

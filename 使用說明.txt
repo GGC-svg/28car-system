@@ -2,8 +2,8 @@
   28Car 車輛管理系統 - 使用說明
 ============================================================
 
-【版本】v1.5.15
-【日期】2026-03-02
+【版本】v1.5.16
+【日期】2026-03-03
 
 目錄
 ----
@@ -169,7 +169,7 @@ build_exe.bat             | 將 Python 程式打包成 exe
   以管理員身分執行 CMD（路徑 請改成實際安裝路徑）：
 
   schtasks /create /tn "28car_backup" /tr "路徑\28car_backup.exe" /sc daily /st 00:00 /f
-  schtasks /create /tn "28car_daily" /tr "路徑\28car_scraper.exe --daily --stale-days 14" /sc daily /st 01:00 /f
+  schtasks /create /tn "28car_daily" /tr "路徑\28car_scraper.exe --daily" /sc daily /st 01:00 /f
   schtasks /create /tn "28car_sms" /tr "路徑\28car_sms.exe --daily" /sc daily /st 10:00 /f
 
 【刪除排程】
@@ -232,6 +232,10 @@ A: 1. 登入管理後台
 ============================================================
 7. 版本更新記錄
 ============================================================
+
+【v1.5.16】2026-03-03
+  - 修正排程呼叫爬蟲時不再帶 --stale-days 參數（預設為 0）
+  - 修正 setup.py、web_demo.py、一鍵部署安裝.bat、installer.iss 的排程設定
 
 【v1.5.15】2026-03-02
   - 優化爬蟲下架標記邏輯（每日更新不標記，週末全量掃描時才標記）

@@ -71,7 +71,7 @@ def run_scraper():
 
     try:
         result = subprocess.run(
-            [sys.executable, script, '--daily', '--stale-days', '14'],
+            [sys.executable, script, '--daily'],
             cwd=BASE_DIR
         )
         if result.returncode == 0:
