@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.8"
+APP_VERSION = "1.5.9"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -2995,17 +2995,23 @@ def api_server_restart():
         import time
         time.sleep(1)  # 等待回應發送完成
 
-        # 啟動新的伺服器進程
+        # 先終止當前進程，然後用 cmd /c 延遲啟動新進程
+        # 這樣可以確保舊進程完全退出後才啟動新進程
         if os.name == 'nt':  # Windows
             exe_path = os.path.join(BASE_DIR, '28car_server.exe')
             if os.path.exists(exe_path):
-                subprocess.Popen(['start', '', exe_path], shell=True, cwd=BASE_DIR)
+                # 使用 cmd /c 執行：等待 2 秒後啟動新進程
+                cmd = f'cmd /c "timeout /t 2 /nobreak >nul && start "" "{exe_path}""'
             else:
-                subprocess.Popen(['start', '', 'python', os.path.join(BASE_DIR, 'web_demo.py')],
-                               shell=True, cwd=BASE_DIR)
+                py_path = os.path.join(BASE_DIR, 'web_demo.py')
+                cmd = f'cmd /c "timeout /t 2 /nobreak >nul && start "" python "{py_path}""'
+            subprocess.Popen(cmd, shell=True, cwd=BASE_DIR,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
         else:  # Linux/Mac
-            subprocess.Popen([sys.executable, os.path.join(BASE_DIR, 'web_demo.py')],
-                           cwd=BASE_DIR, start_new_session=True)
+            # 使用 bash 延遲啟動
+            py_path = os.path.join(BASE_DIR, 'web_demo.py')
+            subprocess.Popen(f'sleep 2 && {sys.executable} "{py_path}"',
+                           shell=True, cwd=BASE_DIR, start_new_session=True)
 
         # 終止當前進程
         os._exit(0)
@@ -3024,7 +3030,12 @@ def api_server_restart():
 # ============================================================
 @app.route('/')
 def index():
-    return send_from_directory(BASE_DIR, 'index.html')
+    response = send_from_directory(BASE_DIR, 'index.html')
+    # 防止瀏覽器快取 HTML 頁面，確保每次都載入最新版本
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 def kill_existing_server():
