@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.13"
+APP_VERSION = "1.5.14"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -132,10 +132,13 @@ def get_db():
 
 
 # ============================================================
-# 認證系統
+# 認證系統（記憶體 Session - 避免 database locked）
 # ============================================================
 SESSION_COOKIE_NAME = '28car_session'
 SESSION_EXPIRE_HOURS = 24
+import threading
+_sessions_lock = threading.Lock()
+_sessions = {}  # {session_id: {'user_id': int, 'expires_at': str, 'ip': str, 'ua': str}}
 
 
 def hash_password(password, salt=None):
@@ -156,50 +159,65 @@ def verify_password(password, stored_hash):
 
 
 def create_session(user_id, ip_address, user_agent):
-    """建立 Session（含重試機制）"""
-    import time
+    """建立 Session（記憶體存儲，不寫資料庫）"""
     session_id = str(uuid.uuid4())
-    now = datetime.now()
-    expires_at = (now + timedelta(hours=SESSION_EXPIRE_HOURS)).isoformat()
-
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            db = get_db()
-            db.execute("""
-                INSERT INTO sessions (session_id, user_id, ip_address, user_agent, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (session_id, user_id, ip_address, user_agent, now.isoformat(), expires_at))
-            db.commit()
-            db.close()
-            return session_id
-        except sqlite3.OperationalError as e:
-            if 'locked' in str(e) and attempt < max_retries - 1:
-                log.warning(f'資料庫鎖定，重試 {attempt + 1}/{max_retries}...')
-                time.sleep(1)
-                continue
-            raise
+    expires_at = (datetime.now() + timedelta(hours=SESSION_EXPIRE_HOURS)).isoformat()
+    
+    with _sessions_lock:
+        # 清理該用戶的舊 session（可選：允許多裝置登入則移除此段）
+        # for sid in list(_sessions.keys()):
+        #     if _sessions[sid]['user_id'] == user_id:
+        #         del _sessions[sid]
+        
+        _sessions[session_id] = {
+            'user_id': user_id,
+            'expires_at': expires_at,
+            'ip': ip_address,
+            'ua': user_agent
+        }
+    
+    # 順便清理過期的 session
+    cleanup_expired_sessions()
     return session_id
 
 
+def cleanup_expired_sessions():
+    """清理過期的 Session"""
+    now = datetime.now().isoformat()
+    with _sessions_lock:
+        expired = [sid for sid, data in _sessions.items() if data['expires_at'] < now]
+        for sid in expired:
+            del _sessions[sid]
+        if expired:
+            log.info(f'清理了 {len(expired)} 個過期 Session')
+
+
 def get_current_user():
-    """從 Cookie 取得當前使用者"""
+    """從記憶體 Session 取得當前使用者"""
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_id:
         return None
 
-    db = get_db()
     now = datetime.now().isoformat()
-    row = db.execute("""
-        SELECT u.id, u.username, u.display_name, u.role, u.must_change_pwd
-        FROM sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.session_id = ? AND s.expires_at > ? AND u.is_active = 1
-    """, (session_id, now)).fetchone()
-    db.close()
-
-    if row:
-        return dict(row)
+    
+    with _sessions_lock:
+        session_data = _sessions.get(session_id)
+        if not session_data or session_data['expires_at'] < now:
+            return None
+        user_id = session_data['user_id']
+    
+    # 從資料庫讀取用戶資料（只讀，不會 locked）
+    try:
+        db = get_db()
+        row = db.execute("""
+            SELECT id, username, display_name, role, must_change_pwd
+            FROM users WHERE id = ? AND is_active = 1
+        """, (user_id,)).fetchone()
+        db.close()
+        if row:
+            return dict(row)
+    except:
+        pass
     return None
 
 
@@ -333,14 +351,14 @@ def api_login():
 
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
-    """登出"""
+    """登出（從記憶體刪除 Session）"""
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
     user = get_current_user()
+    
     if session_id:
-        db = get_db()
-        db.execute('DELETE FROM sessions WHERE session_id = ?', (session_id,))
-        db.commit()
-        db.close()
+        with _sessions_lock:
+            if session_id in _sessions:
+                del _sessions[session_id]
 
     if user:
         log_operation(user['id'], 'LOGOUT', 'user', str(user['id']), {})
