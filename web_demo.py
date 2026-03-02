@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.11"
+APP_VERSION = "1.5.12"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -55,6 +55,33 @@ app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'static'), static_url
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger(__name__)
+
+
+# 全局錯誤處理器 - 捕捉所有未處理的異常
+@app.errorhandler(500)
+def handle_500_error(e):
+    import traceback
+    error_msg = str(e)
+    tb = traceback.format_exc()
+    log.error(f'500 錯誤: {error_msg} | {tb}')
+    return jsonify({
+        'error': '伺服器內部錯誤',
+        'message': error_msg,
+        'details': tb.split(chr(10))[-3] if tb else None
+    }), 500
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    error_msg = str(e)
+    tb = traceback.format_exc()
+    log.error(f'未處理異常: {error_msg} | {tb}')
+    return jsonify({
+        'error': '伺服器錯誤',
+        'message': error_msg,
+        'details': tb.split(chr(10))[-3] if tb else None
+    }), 500
 
 
 def get_script_command(script_name, args=None):
