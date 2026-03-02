@@ -413,15 +413,16 @@ body {
   overflow-y: auto;
 }
 .modal-overlay.active { display: flex; }
-.modal { 
-  background: #fff; 
-  border-radius: 20px; 
-  max-width: 800px; 
-  width: 100%; 
-  max-height: 90vh; 
+.modal, .modal-box {
+  background: #fff;
+  border-radius: 20px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 25px 80px rgba(0,0,0,0.3);
   animation: modalSlideIn 0.3s ease-out;
+  color: #333;
 }
 @keyframes modalSlideIn {
   from { opacity: 0; transform: translateY(-30px) scale(0.95); }
@@ -848,7 +849,8 @@ body.dark-mode .modal-overlay {
   background: rgba(0,0,0,0.8);
 }
 
-body.dark-mode .modal {
+body.dark-mode .modal,
+body.dark-mode .modal-box {
   background: #1a1a2e;
   color: #e0e0e0;
 }
@@ -5353,19 +5355,19 @@ function showAddUserForm() {
       <div class="form-row">
         <div class="form-group" style="margin:0">
           <label>帳號</label>
-          <input type="text" id="newUsername" placeholder="登入帳號">
+          <input type="text" id="addUserUsername" placeholder="登入帳號">
         </div>
         <div class="form-group" style="margin:0">
           <label>密碼</label>
-          <input type="password" id="newPassword" placeholder="至少6字元">
+          <input type="password" id="addUserPassword" placeholder="至少6字元">
         </div>
         <div class="form-group" style="margin:0">
           <label>顯示名稱</label>
-          <input type="text" id="newDisplayName" placeholder="用於溝通紀錄">
+          <input type="text" id="addUserDisplayName" placeholder="用於溝通紀錄">
         </div>
         <div class="form-group" style="margin:0">
           <label>角色</label>
-          <select id="newRole">
+          <select id="addUserRole">
             <option value="user">一般使用者</option>
             <option value="admin">管理員</option>
           </select>
@@ -5373,7 +5375,7 @@ function showAddUserForm() {
       </div>
       <div style="display:flex;gap:10px;align-items:center">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <input type="checkbox" id="newMustChangePwd" checked> 首次登入強制改密碼
+          <input type="checkbox" id="addUserMustChangePwd" checked> 首次登入強制改密碼
         </label>
         <div style="flex:1"></div>
         <button class="btn btn-sm" onclick="saveNewUser()">建立</button>
@@ -5385,11 +5387,11 @@ function showAddUserForm() {
 
 async function saveNewUser() {
   const data = {
-    username: document.getElementById('newUsername').value,
-    password: document.getElementById('newPassword').value,
-    display_name: document.getElementById('newDisplayName').value,
-    role: document.getElementById('newRole').value,
-    must_change_pwd: document.getElementById('newMustChangePwd').checked ? 1 : 0
+    username: document.getElementById('addUserUsername').value,
+    password: document.getElementById('addUserPassword').value,
+    display_name: document.getElementById('addUserDisplayName').value,
+    role: document.getElementById('addUserRole').value,
+    must_change_pwd: document.getElementById('addUserMustChangePwd').checked ? 1 : 0
   };
   if (!data.username || !data.password) {
     alert('請輸入帳號和密碼');
@@ -5405,11 +5407,13 @@ async function saveNewUser() {
     if (r.ok && result.success) {
       document.getElementById('addUserFormArea').innerHTML = '';
       loadAdminUsers();
+      alert('使用者建立成功！');
     } else {
       alert(result.error || '建立失敗');
     }
   } catch(e) {
-    alert('網路錯誤');
+    console.error('saveNewUser error:', e);
+    alert('網路錯誤，請檢查伺服器是否正常運作');
   }
 }
 
