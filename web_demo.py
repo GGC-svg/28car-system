@@ -31,6 +31,11 @@ else:
     # Python 腳本執行
     _default_base = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
+
+# 版本號（用於檢測更新）
+APP_VERSION = "1.5.7"
+GITHUB_REPO = "GGC-svg/28car-system"
+
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
 FLASK_HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
 FLASK_PORT = int(os.environ.get('FLASK_PORT', '5000'))
@@ -2581,101 +2586,86 @@ def api_admin_network_info():
     })
 
 
-def get_git_executable():
-    """取得 Git 執行檔路徑，優先使用 MinGit"""
-    import shutil
+def compare_versions(v1, v2):
+    """比較版本號，回傳: -1 (v1<v2), 0 (v1==v2), 1 (v1>v2)"""
+    def parse_version(v):
+        v = v.lstrip('v')
+        return [int(x) for x in v.split('.')]
 
-    # 優先使用 MinGit（安裝包內附的）
-    mingit_path = os.path.join(BASE_DIR, 'MinGit', 'cmd', 'git.exe')
-    if os.path.exists(mingit_path):
-        return mingit_path
-
-    # 其次使用系統 Git
-    system_git = shutil.which('git')
-    if system_git:
-        return system_git
-
-    return None
+    try:
+        p1, p2 = parse_version(v1), parse_version(v2)
+        for a, b in zip(p1, p2):
+            if a < b: return -1
+            if a > b: return 1
+        return len(p1) - len(p2)
+    except:
+        return 0
 
 
 @app.route('/api/admin/check-update')
 @admin_required
 def api_admin_check_update():
-    """檢查程式更新"""
-    import subprocess
-
-    git_exe = get_git_executable()
+    """檢查程式更新（從 GitHub Release）"""
+    import urllib.request
+    import ssl
 
     try:
-        # 檢查是否有 git
-        if not git_exe:
-            return jsonify({'error': 'Git 未安裝（MinGit 也不存在）', 'has_update': False})
+        url = f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
 
-        # 檢查是否是 git repo
-        result = subprocess.run([git_exe, 'rev-parse', '--git-dir'], capture_output=True, text=True, cwd=BASE_DIR)
-        if result.returncode != 0:
-            return jsonify({'error': '此目錄不是 Git 倉庫', 'has_update': False})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
 
-        # Fetch 遠端更新
-        subprocess.run([git_exe, 'fetch', 'origin'], capture_output=True, text=True, cwd=BASE_DIR)
+        req = urllib.request.Request(url, headers={'User-Agent': '28car-system'})
 
-        # 取得本地和遠端版本
-        local = subprocess.run([git_exe, 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=BASE_DIR).stdout.strip()
-        remote = subprocess.run([git_exe, 'rev-parse', 'origin/main'], capture_output=True, text=True, cwd=BASE_DIR).stdout.strip()
+        try:
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+                data = json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return jsonify({
+                    'has_update': False,
+                    'local_version': APP_VERSION,
+                    'remote_version': None,
+                    'message': '尚無發布版本'
+                })
+            raise
 
-        has_update = local != remote
+        remote_version = data.get('tag_name', '').lstrip('v')
+        release_notes = data.get('body', '')
+        release_url = data.get('html_url', '')
 
-        # 取得更新內容
-        commits = []
-        if has_update:
-            log_result = subprocess.run(
-                [git_exe, 'log', '--oneline', 'HEAD..origin/main'],
-                capture_output=True, text=True, cwd=BASE_DIR
-            )
-            commits = log_result.stdout.strip().split('\n') if log_result.stdout.strip() else []
+        download_url = None
+        for asset in data.get('assets', []):
+            if asset['name'].endswith('.exe') or asset['name'].endswith('.zip'):
+                download_url = asset['browser_download_url']
+                break
+
+        has_update = compare_versions(APP_VERSION, remote_version) < 0
 
         return jsonify({
             'has_update': has_update,
-            'local_version': local[:8],
-            'remote_version': remote[:8],
-            'commits': commits,
-            'git_source': 'MinGit' if 'MinGit' in git_exe else 'System'
+            'local_version': APP_VERSION,
+            'remote_version': remote_version,
+            'release_notes': release_notes,
+            'release_url': release_url,
+            'download_url': download_url
         })
+
     except Exception as e:
-        return jsonify({'error': str(e), 'has_update': False})
+        return jsonify({'error': f'檢查更新失敗: {str(e)}', 'has_update': False, 'local_version': APP_VERSION})
 
 
 @app.route('/api/admin/do-update', methods=['POST'])
 @admin_required
 def api_admin_do_update():
-    """執行程式更新"""
-    import subprocess
+    """回傳下載頁面連結（不再自動更新）"""
+    return jsonify({
+        'success': True,
+        'message': '請從 GitHub Release 頁面下載最新安裝程式',
+        'download_page': f'https://github.com/{GITHUB_REPO}/releases/latest'
+    })
 
-    git_exe = get_git_executable()
-
-    if not git_exe:
-        return jsonify({'success': False, 'error': 'Git 未安裝'})
-
-    try:
-        result = subprocess.run(
-            [git_exe, 'pull', 'origin', 'main', '--ff-only'],
-            capture_output=True, text=True, cwd=BASE_DIR
-        )
-        
-        if result.returncode == 0:
-            return jsonify({
-                'success': True,
-                'message': '更新完成！請重新啟動伺服器以套用更新。',
-                'output': result.stdout
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '更新失敗',
-                'error': result.stderr
-            })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
 
 # ============================================================
