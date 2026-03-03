@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.20"
+APP_VERSION = "1.5.21"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -154,7 +154,7 @@ def verify_password(password, stored_hash):
     try:
         salt, hash_val = stored_hash.split(':')
         return hash_password(password, salt) == stored_hash
-    except:
+    except Exception:
         return False
 
 
@@ -207,17 +207,20 @@ def get_current_user():
         user_id = session_data['user_id']
     
     # 從資料庫讀取用戶資料（只讀，不會 locked）
+    db = None
     try:
         db = get_db()
         row = db.execute("""
             SELECT id, username, display_name, role, must_change_pwd
             FROM users WHERE id = ? AND is_active = 1
         """, (user_id,)).fetchone()
-        db.close()
         if row:
             return dict(row)
-    except:
+    except Exception:
         pass
+    finally:
+        if db:
+            db.close()
     return None
 
 
@@ -746,13 +749,17 @@ def api_stats():
     db.close()
 
     # 加入網路資訊
+    local_ip = '127.0.0.1'
+    s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 80))
         local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        local_ip = '127.0.0.1'
+    except Exception:
+        pass
+    finally:
+        if s:
+            s.close()
     stats['network'] = {
         'local_ip': local_ip,
         'port': 5000,
@@ -1804,7 +1811,7 @@ def api_crm_campaign_execute(campaign_id):
 
     try:
         target_filter = json.loads(campaign.get('target_filter') or '{}')
-    except:
+    except Exception:
         target_filter = {}
 
     where = ["cg.canonical_phone != ''"]
@@ -2632,13 +2639,17 @@ def api_admin_update_settings():
 def api_admin_network_info():
     """取得區域網路資訊"""
     hostname = socket.gethostname()
+    local_ip = '127.0.0.1'
+    s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 80))
         local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        local_ip = '127.0.0.1'
+    except Exception:
+        pass
+    finally:
+        if s:
+            s.close()
 
     return jsonify({
         'hostname': hostname,
@@ -2660,7 +2671,7 @@ def compare_versions(v1, v2):
             if a < b: return -1
             if a > b: return 1
         return len(p1) - len(p2)
-    except:
+    except Exception:
         return 0
 
 
@@ -3021,7 +3032,7 @@ def api_admin_run_daily_scraper():
         try:
             with open(daily_log_path, 'a', encoding='utf-8') as f:
                 f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
-        except:
+        except Exception:
             pass
 
     def run_scraper():
