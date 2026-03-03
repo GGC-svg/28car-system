@@ -60,7 +60,7 @@ echo  步驟 1/2: 執行每日爬蟲
 echo ============================================
 echo [%date% %time%] 開始執行爬蟲 >> "%LOG_FILE%"
 
-python scraper_28car.py --daily --stale-days 7
+python scraper_28car.py --stale-days 7
 set SCRAPER_RESULT=%errorlevel%
 
 if %SCRAPER_RESULT%==0 (

@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.17"
+APP_VERSION = "1.5.18"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -2765,6 +2765,57 @@ def api_admin_do_update():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+
+# ============================================================
+# 遠端日誌查看 API
+# ============================================================
+
+@app.route('/api/admin/system-logs')
+@admin_required
+def api_admin_system_logs():
+    """列出可用的日誌檔案"""
+    log_files = []
+    for filename in ['scraper.log', 'sms_sender.log', 'daily_task.log', 'server.log']:
+        filepath = os.path.join(BASE_DIR, filename)
+        if os.path.exists(filepath):
+            stat = os.stat(filepath)
+            log_files.append({
+                'name': filename,
+                'size': stat.st_size,
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            })
+    return jsonify({'logs': log_files})
+
+
+@app.route('/api/admin/system-logs/<filename>')
+@admin_required
+def api_admin_system_log_content(filename):
+    """讀取指定日誌檔案內容"""
+    # 安全檢查：只允許讀取特定日誌檔案
+    allowed_logs = ['scraper.log', 'sms_sender.log', 'daily_task.log', 'server.log']
+    if filename not in allowed_logs:
+        return jsonify({'error': '不允許讀取此檔案'}), 403
+
+    filepath = os.path.join(BASE_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': '檔案不存在'}), 404
+
+    # 讀取最後 N 行（預設 200 行）
+    lines = request.args.get('lines', 200, type=int)
+    lines = min(lines, 1000)  # 最多 1000 行
+
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            all_lines = f.readlines()
+            tail = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            return jsonify({
+                'filename': filename,
+                'total_lines': len(all_lines),
+                'returned_lines': len(tail),
+                'content': ''.join(tail)
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================

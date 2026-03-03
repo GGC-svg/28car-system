@@ -39,7 +39,7 @@ echo.
 echo [1/2] 執行每日爬蟲...
 echo [%date% %time%] 開始執行爬蟲 >> "%LOG_FILE%"
 
-"%~dp028car_scraper.exe" --daily --stale-days 7
+"%~dp028car_scraper.exe" --stale-days 7
 set SCRAPER_RESULT=%errorlevel%
 
 if %SCRAPER_RESULT%==0 (

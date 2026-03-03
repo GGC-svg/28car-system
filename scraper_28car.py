@@ -1752,14 +1752,28 @@ def main():
                 download_images=not args.no_images,
                 sources=sources,
             )
+
+            # 全量掃描後標記下架車輛
+            if args.stale_days > 0:
+                log.info("")
+                log.info(f"標記超過 {args.stale_days} 天未出現的車輛為下架...")
+                conn = sqlite3.connect(DB_PATH, timeout=30)
+                conn.execute("PRAGMA journal_mode=WAL")
+                stale_count = scraper._mark_stale_cars(conn, args.stale_days)
+                conn.close()
+                stats['stale_marked'] = stale_count
+            else:
+                stats['stale_marked'] = 0
+
             log.info("")
-            log.info("爬蟲完成！")
+            log.info("全量掃描完成！")
             log.info(f"  列表頁數: {stats['total_pages']}")
             log.info(f"  列表車輛: {stats['total_list_cars']}")
             log.info(f"  新增: {stats['new_cars']}")
             log.info(f"  更新: {stats['updated_cars']}")
             log.info(f"  詳情: {stats['details_scraped']}")
             log.info(f"  圖片: {stats['photos_downloaded']}")
+            log.info(f"  標記下架: {stats['stale_marked']}")
 
         # 爬蟲完成後重建聯絡人分組
         try:
