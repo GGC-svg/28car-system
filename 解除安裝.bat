@@ -9,6 +9,8 @@ echo.
 echo 這將會移除:
 echo   - 桌面捷徑
 echo   - 開機自動啟動設定
+echo   - 排程任務
+echo   - 防火牆規則
 echo.
 echo 注意: 不會刪除程式檔案和資料庫
 echo.
@@ -34,6 +36,28 @@ if exist "%STARTUP_FOLDER%\28Car伺服器.lnk" (
     del "%STARTUP_FOLDER%\28Car伺服器.lnk"
     echo [OK] 已移除開機自動啟動
 )
+if exist "%STARTUP_FOLDER%\28Car Server.lnk" (
+    del "%STARTUP_FOLDER%\28Car Server.lnk"
+    echo [OK] 已移除開機自動啟動
+)
+
+:: 移除排程任務
+echo.
+echo 移除排程任務...
+schtasks /delete /tn "28car_backup" /f >nul 2>&1
+if %errorlevel%==0 echo [OK] 已移除 28car_backup
+schtasks /delete /tn "28car_daily" /f >nul 2>&1
+if %errorlevel%==0 echo [OK] 已移除 28car_daily
+schtasks /delete /tn "28car_weekly" /f >nul 2>&1
+if %errorlevel%==0 echo [OK] 已移除 28car_weekly
+schtasks /delete /tn "28car_sms" /f >nul 2>&1
+if %errorlevel%==0 echo [OK] 已移除 28car_sms
+
+:: 移除防火牆規則
+echo.
+echo 移除防火牆規則...
+netsh advfirewall firewall delete rule name="28Car Server" >nul 2>&1
+if %errorlevel%==0 echo [OK] 已移除防火牆規則
 
 echo.
 echo ============================================

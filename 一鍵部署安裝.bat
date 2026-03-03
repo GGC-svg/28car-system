@@ -55,7 +55,7 @@ echo.
 echo 即將執行以下設定:
 echo   [1] 建立桌面捷徑
 echo   [2] 設定開機自動啟動
-echo   [3] 設定每日排程（備份 00:00、爬蟲 01:00、簡訊 10:00）
+echo   [3] 設定排程（備份、爬蟲週一～五、全量掃描週六、簡訊）
 echo   [4] 設定防火牆（允許區域網路連線）
 echo   [5] 啟動伺服器
 echo.
@@ -108,6 +108,7 @@ echo ============================================
 :: 刪除舊排程（如果存在）
 schtasks /delete /tn "28car_backup" /f >nul 2>&1
 schtasks /delete /tn "28car_daily" /f >nul 2>&1
+schtasks /delete /tn "28car_weekly" /f >nul 2>&1
 schtasks /delete /tn "28car_sms" /f >nul 2>&1
 
 :: 建立備份排程（每天 00:00）
@@ -122,16 +123,28 @@ if %errorlevel%==0 (
     echo [!] 備份排程設定失敗
 )
 
-:: 建立爬蟲排程（每天 01:00）
+:: 建立爬蟲排程（週一～五 01:00）
 if exist "%SCRIPT_DIR%\28car_scraper.exe" (
-    schtasks /create /tn "28car_daily" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --daily" /sc daily /st 01:00 /f >nul 2>&1
+    schtasks /create /tn "28car_daily" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --daily" /sc weekly /d MON,TUE,WED,THU,FRI /st 01:00 /f >nul 2>&1
 ) else (
-    schtasks /create /tn "28car_daily" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --daily" /sc daily /st 01:00 /f >nul 2>&1
+    schtasks /create /tn "28car_daily" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --daily" /sc weekly /d MON,TUE,WED,THU,FRI /st 01:00 /f >nul 2>&1
 )
 if %errorlevel%==0 (
-    echo [OK] 28car_daily - 每天 01:00 自動執行爬蟲
+    echo [OK] 28car_daily - 週一～五 01:00 快速更新
 ) else (
     echo [!] 爬蟲排程設定失敗
+)
+
+:: 建立週六全量掃描排程（週六 02:00）
+if exist "%SCRIPT_DIR%\28car_scraper.exe" (
+    schtasks /create /tn "28car_weekly" /tr "\"%SCRIPT_DIR%\28car_scraper.exe\" --stale-days 7" /sc weekly /d SAT /st 02:00 /f >nul 2>&1
+) else (
+    schtasks /create /tn "28car_weekly" /tr "python \"%SCRIPT_DIR%\scraper_28car.py\" --stale-days 7" /sc weekly /d SAT /st 02:00 /f >nul 2>&1
+)
+if %errorlevel%==0 (
+    echo [OK] 28car_weekly - 週六 02:00 全量掃描 + 標記下架
+) else (
+    echo [!] 週六掃描排程設定失敗
 )
 
 :: 建立簡訊排程（每天 10:00）
@@ -195,6 +208,7 @@ echo ============================================
 :: 驗證排程任務是否建立成功
 set "BACKUP_OK=0"
 set "DAILY_OK=0"
+set "WEEKLY_OK=0"
 set "SMS_OK=0"
 
 schtasks /query /tn "28car_backup" >nul 2>&1
@@ -211,6 +225,14 @@ if %errorlevel%==0 (
     echo [OK] 28car_daily：已建立
 ) else (
     echo [!!] 28car_daily：建立失敗
+)
+
+schtasks /query /tn "28car_weekly" >nul 2>&1
+if %errorlevel%==0 (
+    set "WEEKLY_OK=1"
+    echo [OK] 28car_weekly：已建立
+) else (
+    echo [!!] 28car_weekly：建立失敗
 )
 
 schtasks /query /tn "28car_sms" >nul 2>&1
@@ -230,14 +252,15 @@ echo  桌面已新增:
 echo    - 28Car Server（啟動伺服器）
 echo    - 28Car Web（開啟網頁）
 echo.
-if "!BACKUP_OK!"=="1" if "!DAILY_OK!"=="1" if "!SMS_OK!"=="1" (
+if "!BACKUP_OK!"=="1" if "!DAILY_OK!"=="1" if "!WEEKLY_OK!"=="1" if "!SMS_OK!"=="1" (
     echo  [OK] 自動化設定（全部成功）:
 ) else (
     echo  [!] 自動化設定（部分失敗，請檢查上方訊息）:
 )
 echo    - 開機時伺服器會自動啟動
 echo    - 每天 00:00 自動備份資料庫
-echo    - 每天 01:00 自動執行爬蟲更新資料
+echo    - 週一～五 01:00 快速更新爬蟲
+echo    - 週六 02:00 全量掃描 + 標記下架
 echo    - 每天 10:00 自動發送簡訊
 echo.
 echo  ============================================
