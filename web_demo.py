@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.16"
+APP_VERSION = "1.5.17"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -2662,6 +2662,23 @@ def compare_versions(v1, v2):
         return 0
 
 
+def get_git_executable():
+    """取得 Git 執行檔路徑，優先使用 MinGit"""
+    import shutil
+
+    # 優先使用 MinGit（安裝包內附的）
+    mingit_path = os.path.join(BASE_DIR, 'MinGit', 'cmd', 'git.exe')
+    if os.path.exists(mingit_path):
+        return mingit_path
+
+    # 其次使用系統 Git
+    system_git = shutil.which('git')
+    if system_git:
+        return system_git
+
+    return None
+
+
 @app.route('/api/admin/check-update')
 @admin_required
 def api_admin_check_update():
@@ -2719,12 +2736,34 @@ def api_admin_check_update():
 @app.route('/api/admin/do-update', methods=['POST'])
 @admin_required
 def api_admin_do_update():
-    """回傳下載頁面連結（不再自動更新）"""
-    return jsonify({
-        'success': True,
-        'message': '請從 GitHub Release 頁面下載最新安裝程式',
-        'download_page': f'https://github.com/{GITHUB_REPO}/releases/latest'
-    })
+    """執行程式更新（git pull）"""
+    import subprocess
+
+    git_exe = get_git_executable()
+
+    if not git_exe:
+        return jsonify({'success': False, 'error': 'Git 未安裝'})
+
+    try:
+        result = subprocess.run(
+            [git_exe, 'pull', 'origin', 'main', '--ff-only'],
+            capture_output=True, text=True, cwd=BASE_DIR
+        )
+
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': '更新完成！請重新啟動伺服器以套用更新。',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '更新失敗',
+                'error': result.stderr
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 
 
