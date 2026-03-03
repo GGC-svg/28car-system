@@ -58,7 +58,7 @@ tmpclaude-*
 
 # 匯出檔案
 *.json
-!sms_config.json
+# sms_config.json 包含 API 密鑰，不推送
 
 # 編譯產物（exe 保留在 git 中，方便遠端更新）
 # *.exe
