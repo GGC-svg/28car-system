@@ -3051,6 +3051,58 @@ async function init() {
   document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadCars(1); });
   document.getElementById('contactSearch').addEventListener('keydown', e => { if (e.key === 'Enter') loadContacts(1); });
   // CRM 聯絡人管理已移除
+
+  // 每天自動檢查更新一次
+  autoCheckUpdate();
+}
+
+async function autoCheckUpdate() {
+  try {
+    const lastCheck = localStorage.getItem('lastUpdateCheck');
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000; // 24 小時
+
+    // 如果從未檢查過，或超過 24 小時，自動檢查
+    if (!lastCheck || (now - parseInt(lastCheck)) > oneDay) {
+      const res = await fetch('/api/admin/check-update');
+      const data = await res.json();
+
+      localStorage.setItem('lastUpdateCheck', now.toString());
+
+      if (data.has_update) {
+        // 顯示更新通知
+        showUpdateNotification(data.local_version, data.remote_version);
+      }
+    }
+  } catch (e) {
+    console.log('自動檢查更新失敗:', e);
+  }
+}
+
+function showUpdateNotification(localVer, remoteVer) {
+  // 建立通知元素
+  const notification = document.createElement('div');
+  notification.id = 'updateNotification';
+  notification.style.cssText = 'position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;padding:16px 20px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;max-width:300px;animation:slideIn 0.3s ease';
+  notification.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:24px">🔄</span>
+      <div>
+        <div style="font-weight:600;margin-bottom:4px">發現新版本 v${remoteVer}</div>
+        <div style="font-size:12px;opacity:0.9">目前版本: v${localVer}</div>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;margin-left:auto">&times;</button>
+    </div>
+    <button onclick="openAdminPanel();this.parentElement.remove()" style="width:100%;margin-top:12px;padding:8px;background:rgba(255,255,255,0.2);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:13px">前往更新</button>
+  `;
+  document.body.appendChild(notification);
+
+  // 30 秒後自動消失
+  setTimeout(() => {
+    if (document.getElementById('updateNotification')) {
+      notification.remove();
+    }
+  }, 30000);
 }
 
 // ============================================================

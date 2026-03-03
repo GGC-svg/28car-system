@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.21"
+APP_VERSION = "1.5.22"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -2749,34 +2749,85 @@ def api_admin_check_update():
 @app.route('/api/admin/do-update', methods=['POST'])
 @admin_required
 def api_admin_do_update():
-    """執行程式更新（git pull）"""
-    import subprocess
+    """執行程式更新（從 GitHub 下載檔案）"""
+    import urllib.request
+    import urllib.parse
+    import ssl
+    import shutil
 
-    git_exe = get_git_executable()
+    # 需要更新的檔案列表
+    UPDATE_FILES = [
+        '28car_server.exe',
+        '28car_scraper.exe',
+        '28car_sms.exe',
+        '28car_backup.exe',
+        'web_demo.py',
+        'scraper_28car.py',
+        'sms_sender.py',
+        'backup_db.py',
+        'index.html',
+        '使用說明.txt',
+        '部署說明.txt',
+    ]
 
-    if not git_exe:
-        return jsonify({'success': False, 'error': 'Git 未安裝'})
+    # GitHub raw URL
+    RAW_BASE_URL = f'https://raw.githubusercontent.com/{GITHUB_REPO}/main'
 
-    try:
-        result = subprocess.run(
-            [git_exe, 'pull', 'origin', 'main', '--ff-only'],
-            capture_output=True, text=True, cwd=BASE_DIR
-        )
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
 
-        if result.returncode == 0:
-            return jsonify({
-                'success': True,
-                'message': '更新完成！請重新啟動伺服器以套用更新。',
-                'output': result.stdout
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '更新失敗',
-                'error': result.stderr
-            })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    updated_files = []
+    failed_files = []
+
+    for filename in UPDATE_FILES:
+        try:
+            # 下載檔案
+            url = f'{RAW_BASE_URL}/{urllib.parse.quote(filename)}'
+            req = urllib.request.Request(url, headers={'User-Agent': '28car-system'})
+
+            with urllib.request.urlopen(req, timeout=60, context=ctx) as response:
+                content = response.read()
+
+            # 備份原檔案
+            local_path = os.path.join(BASE_DIR, filename)
+            backup_path = local_path + '.bak'
+
+            if os.path.exists(local_path):
+                shutil.copy2(local_path, backup_path)
+
+            # 寫入新檔案
+            with open(local_path, 'wb') as f:
+                f.write(content)
+
+            # 刪除備份
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            updated_files.append(filename)
+
+        except Exception as e:
+            failed_files.append({'file': filename, 'error': str(e)})
+            # 還原備份
+            backup_path = os.path.join(BASE_DIR, filename + '.bak')
+            local_path = os.path.join(BASE_DIR, filename)
+            if os.path.exists(backup_path):
+                shutil.copy2(backup_path, local_path)
+                os.remove(backup_path)
+
+    if failed_files:
+        return jsonify({
+            'success': False,
+            'message': f'部分檔案更新失敗',
+            'updated': updated_files,
+            'failed': failed_files
+        })
+
+    return jsonify({
+        'success': True,
+        'message': '更新完成！請重新啟動伺服器以套用更新。',
+        'updated': updated_files
+    })
 
 
 # ============================================================
