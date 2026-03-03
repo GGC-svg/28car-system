@@ -21,13 +21,13 @@ echo.
 
 :: 移除桌面捷徑
 set "DESKTOP=%USERPROFILE%\Desktop"
-if exist "%DESKTOP%\28Car 車輛管理.lnk" (
-    del "%DESKTOP%\28Car 車輛管理.lnk"
-    echo [OK] 已移除桌面捷徑: 28Car 車輛管理
+if exist "%DESKTOP%\28Car Server.lnk" (
+    del "%DESKTOP%\28Car Server.lnk"
+    echo [OK] 已移除桌面捷徑: 28Car Server
 )
-if exist "%DESKTOP%\28Car 開啟網頁.lnk" (
-    del "%DESKTOP%\28Car 開啟網頁.lnk"
-    echo [OK] 已移除桌面捷徑: 28Car 開啟網頁
+if exist "%DESKTOP%\28Car Web.lnk" (
+    del "%DESKTOP%\28Car Web.lnk"
+    echo [OK] 已移除桌面捷徑: 28Car Web
 )
 
 :: 移除開機自動啟動

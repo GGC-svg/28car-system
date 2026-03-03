@@ -2530,56 +2530,6 @@ body.dark-mode .action-badge {
   </div>
 </div>
 
-<!-- ==================== SMS Send Confirm Modal ==================== -->
-<div class="modal-overlay" id="smsSendConfirmModal" onclick="if(event.target===this)closeModal('smsSendConfirmModal')">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-header">
-      <h2>確認發送簡訊</h2>
-      <button class="modal-close" onclick="closeModal('smsSendConfirmModal')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:linear-gradient(135deg, #C7EDCC 0%, #81C784 100%);border-radius:12px;padding:20px;color:#fff;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:13px;opacity:0.8">發送對象</div>
-            <div style="font-size:18px;font-weight:700;margin-top:4px" id="confirmSourceName">聯絡人目錄 - 私人賣家</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:36px;font-weight:800" id="confirmCount">0</div>
-            <div style="font-size:12px;opacity:0.8">通簡訊</div>
-          </div>
-        </div>
-      </div>
-      
-      <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:20px">
-        <div style="font-size:13px;color:#666;margin-bottom:8px">使用模板</div>
-        <div style="font-weight:600" id="confirmTemplateName">-</div>
-        <div style="font-size:13px;color:#888;margin-top:8px;padding:12px;background:#fff;border-radius:8px;max-height:100px;overflow-y:auto" id="confirmTemplateContent">-</div>
-      </div>
-      
-      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:16px;margin-bottom:20px">
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <span style="font-size:20px">&#9888;</span>
-          <div>
-            <div style="font-weight:600;color:#856404">注意事項</div>
-            <div style="font-size:13px;color:#856404;margin-top:4px">
-              發送後無法撤回，請確認發送對象和內容正確。<br>
-              每則簡訊將從您的 OneWaySMS 帳戶扣款。
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div style="display:flex;gap:12px">
-        <button class="btn btn-outline" style="flex:1" onclick="closeModal('smsSendConfirmModal')">取消</button>
-        <button class="btn btn-green" style="flex:1" onclick="executeSendSms()">
-          <span style="font-size:16px">&#9889;</span> 確定發送
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ==================== SMS Detail Modal ==================== -->
 <div class="modal-overlay" id="smsDetailModal" onclick="if(event.target===this)closeModal('smsDetailModal')">
   <div class="modal" style="max-width:500px">

@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.19"
+APP_VERSION = "1.5.20"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -1118,7 +1118,9 @@ def api_batch_update_classification():
     db.commit()
 
     # 記錄操作日誌
-    log_operation(db, 'BATCH_UPDATE_CLASSIFICATION', 'contact_groups',
+    user = get_current_user()
+    user_id = user['id'] if user else None
+    log_operation(user_id, 'BATCH_UPDATE_CLASSIFICATION', 'contact_groups',
                   ','.join(map(str, group_ids)),
                   {'classification': classification, 'count': len(group_ids)})
 
@@ -3135,6 +3137,7 @@ def api_server_health():
 
 
 @app.route('/api/server/restart', methods=['POST'])
+@login_required
 def api_server_restart():
     """重啟伺服器"""
     import subprocess
