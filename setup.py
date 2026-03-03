@@ -180,16 +180,40 @@ def setup_scheduled_tasks():
             tr = f'"{script}"'
 
         # 建立新排程
-        result = subprocess.run(
-            ['schtasks', '/create', '/tn', task_name, '/tr', tr,
-             '/sc', 'daily', '/st', time, '/f'],
-            capture_output=True
-        )
+        # 28car_daily 改為週一到週五，其他維持每天
+        if task_name == '28car_daily':
+            result = subprocess.run(
+                ['schtasks', '/create', '/tn', task_name, '/tr', tr,
+                 '/sc', 'weekly', '/d', 'MON,TUE,WED,THU,FRI', '/st', time, '/f'],
+                capture_output=True
+            )
+        else:
+            result = subprocess.run(
+                ['schtasks', '/create', '/tn', task_name, '/tr', tr,
+                 '/sc', 'daily', '/st', time, '/f'],
+                capture_output=True
+            )
 
         if result.returncode == 0:
             print(f"  [OK] {desc} ({task_name}) - 每日 {time}")
         else:
             print(f"  [!] {desc} 設定失敗（需要管理員權限）")
+
+    # 週六全量掃描排程
+    subprocess.run(['schtasks', '/delete', '/tn', '28car_weekly', '/f'], capture_output=True)
+    if is_exe:
+        weekly_tr = f'"{os.path.join(BASE_DIR, "28car_scraper.exe")}" --stale-days 7'
+    else:
+        weekly_tr = f'"{sys.executable}" "{os.path.join(BASE_DIR, "scraper_28car.py")}" --stale-days 7'
+    result = subprocess.run(
+        ['schtasks', '/create', '/tn', '28car_weekly', '/tr', weekly_tr,
+         '/sc', 'weekly', '/d', 'SAT', '/st', '02:00', '/f'],
+        capture_output=True
+    )
+    if result.returncode == 0:
+        print(f"  [OK] 週六全量掃描 (28car_weekly) - 每週六 02:00")
+    else:
+        print(f"  [!] 週六全量掃描設定失敗（需要管理員權限）")
 
 
 def setup_firewall():
@@ -275,7 +299,7 @@ def uninstall():
     print("移除 28Car 安裝...")
 
     # 移除排程
-    for task in ['28car_daily', '28car_sms', '28car_backup']:
+    for task in ['28car_daily', '28car_weekly', '28car_sms', '28car_backup']:
         subprocess.run(['schtasks', '/delete', '/tn', task, '/f'], capture_output=True)
         print(f"  已移除排程: {task}")
 
