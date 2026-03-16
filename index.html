@@ -2789,6 +2789,7 @@ body.dark-mode .action-badge {
       <button class="btn btn-sm admin-tab-btn" id="adminTabUsers" onclick="switchAdminTab('users')">使用者管理</button>
       <button class="btn btn-sm btn-outline admin-tab-btn" id="adminTabLogs" onclick="switchAdminTab('logs')">操作日誌</button>
       <button class="btn btn-sm btn-outline admin-tab-btn" id="adminTabSchedules" onclick="switchAdminTab('schedules')">排程管理</button>
+      <button class="btn btn-sm btn-outline admin-tab-btn" id="adminTabScraper" onclick="switchAdminTab('scraper')">爬蟲診斷</button>
       <button class="btn btn-sm btn-outline admin-tab-btn" id="adminTabNetwork" onclick="switchAdminTab('network')">網路資訊</button>
     </div>
     <div class="modal-body" style="flex:1;overflow-y:auto">
@@ -2933,6 +2934,81 @@ body.dark-mode .action-badge {
                 尚無執行記錄
               </div>
               <p style="margin:8px 0 0;font-size:11px;color:#888">日誌檔案位置：daily_task.log（自動保留最近 1000 行）</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 爬蟲診斷 -->
+      <div id="adminPanelScraper" style="display:none">
+        <div class="network-info-card">
+          <h4>🔍 爬蟲設定與診斷</h4>
+          <p style="color:#666;margin-bottom:20px">查看目前爬蟲的關鍵設定，診斷爬蟲是否正常運作</p>
+
+          <div id="scraperConfigLoading" style="text-align:center;padding:20px;color:#666">載入中...</div>
+
+          <div id="scraperConfigContent" style="display:none">
+            <!-- 目前設定 -->
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <h5 style="margin:0 0 12px 0">📡 目前讀取設定</h5>
+              <div style="display:grid;gap:8px">
+                <div class="info-row">
+                  <span class="info-label">主要域名 (BASE_URL)</span>
+                  <span class="info-value" id="scraperBaseUrl">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">CDN 域名 (CDN_URL)</span>
+                  <span class="info-value" id="scraperCdnUrl">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 列表頁 URL -->
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <h5 style="margin:0 0 12px 0">📋 列表頁網址</h5>
+              <div id="scraperListUrls" style="font-family:monospace;font-size:13px"></div>
+            </div>
+
+            <!-- 延遲設定 -->
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <h5 style="margin:0 0 12px 0">⏱️ 延遲設定（秒）</h5>
+              <div style="display:grid;gap:8px">
+                <div class="info-row">
+                  <span class="info-label">列表頁間隔</span>
+                  <span class="info-value" id="scraperPageDelay">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">詳情頁間隔</span>
+                  <span class="info-value" id="scraperDetailDelay">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 診斷測試 -->
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;background:#f9f9f9">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h5 style="margin:0">🧪 即時診斷測試</h5>
+                <button class="btn btn-sm" onclick="runScraperTest()">執行測試</button>
+              </div>
+              <div id="scraperTestResult" style="padding:12px;background:#fff;border-radius:4px;font-size:13px">
+                點擊「執行測試」按鈕，測試爬蟲是否能正常抓取網頁內容
+              </div>
+            </div>
+
+            <!-- 最近執行記錄 -->
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;background:#f9f9f9">
+              <h5 style="margin:0 0 12px 0">📊 最近 5 次執行記錄</h5>
+              <table class="admin-table" style="font-size:12px">
+                <thead>
+                  <tr>
+                    <th>開始時間</th>
+                    <th>狀態</th>
+                    <th>新增</th>
+                    <th>更新</th>
+                    <th>無變動</th>
+                  </tr>
+                </thead>
+                <tbody id="scraperRecentRuns"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -5314,7 +5390,7 @@ function openAdminPanel() {
 }
 
 function switchAdminTab(tab) {
-  ['users', 'logs', 'schedules', 'network'].forEach(t => {
+  ['users', 'logs', 'schedules', 'scraper', 'network'].forEach(t => {
     document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
     document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('btn-outline', t !== tab);
     document.getElementById('adminPanel' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? 'block' : 'none';
@@ -5322,6 +5398,7 @@ function switchAdminTab(tab) {
   if (tab === 'users') loadAdminUsers();
   if (tab === 'logs') loadAdminLogs(1);
   if (tab === 'schedules') loadSchedules();
+  if (tab === 'scraper') loadScraperConfig();
   if (tab === 'network') loadNetworkInfo();
 }
 
@@ -5633,6 +5710,93 @@ async function clearOldLogs() {
   } catch(e) {
     console.error('clearOldLogs:', e);
     alert('清理失敗');
+  }
+}
+
+// 爬蟲診斷
+async function loadScraperConfig() {
+  document.getElementById('scraperConfigLoading').style.display = 'block';
+  document.getElementById('scraperConfigContent').style.display = 'none';
+  try {
+    const r = await fetch('/api/admin/scraper-config');
+    const data = await r.json();
+
+    // 設定資訊
+    document.getElementById('scraperBaseUrl').textContent = data.base_url || '-';
+    document.getElementById('scraperCdnUrl').textContent = data.cdn_url || '-';
+
+    // 列表頁 URL
+    const listUrlsDiv = document.getElementById('scraperListUrls');
+    let listHtml = '';
+    for (const [source, url] of Object.entries(data.list_urls || {})) {
+      const sourceName = source === 'sell' ? '私人賣車庫' : '車行賣車庫';
+      listHtml += `<div style="margin-bottom:8px"><strong>${sourceName}:</strong><br><a href="${url}" target="_blank" style="color:#0066cc">${url}</a></div>`;
+    }
+    listUrlsDiv.innerHTML = listHtml || '-';
+
+    // 延遲設定
+    const delays = data.delays || {};
+    document.getElementById('scraperPageDelay').textContent = `${delays.page_min || '-'} ~ ${delays.page_max || '-'} 秒`;
+    document.getElementById('scraperDetailDelay').textContent = `${delays.detail_min || '-'} ~ ${delays.detail_max || '-'} 秒`;
+
+    // 最近執行記錄
+    const runsBody = document.getElementById('scraperRecentRuns');
+    const runs = data.recent_runs || [];
+    if (runs.length === 0) {
+      runsBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">尚無執行記錄</td></tr>';
+    } else {
+      runsBody.innerHTML = runs.map(r => {
+        const statusClass = r.status === 'success' ? 'color:#080' : (r.status === 'running' ? 'color:#f90' : 'color:#c00');
+        const statusText = r.status === 'success' ? '成功' : (r.status === 'running' ? '執行中' : r.status);
+        return `<tr>
+          <td style="font-size:11px">${(r.started_at || '').substring(0, 16).replace('T', ' ')}</td>
+          <td style="${statusClass}">${statusText}</td>
+          <td>${r.new_cars || 0}</td>
+          <td>${r.updated_cars || 0}</td>
+          <td>${r.unchanged_cars || 0}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('scraperConfigLoading').style.display = 'none';
+    document.getElementById('scraperConfigContent').style.display = 'block';
+  } catch(e) {
+    console.error('loadScraperConfig:', e);
+    document.getElementById('scraperConfigLoading').textContent = '載入失敗: ' + e.message;
+  }
+}
+
+async function runScraperTest() {
+  const resultDiv = document.getElementById('scraperTestResult');
+  resultDiv.innerHTML = '<span style="color:#666">測試中，請稍候...</span>';
+
+  try {
+    const r = await fetch('/api/admin/scraper-test', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await r.json();
+
+    let html = '';
+    if (data.success) {
+      html = `<div style="color:#080"><strong>✓ 測試成功！</strong></div>
+        <div style="margin-top:8px">
+          <div>HTTP 狀態碼: ${data.status_code}</div>
+          <div>回應大小: ${(data.content_length / 1024).toFixed(1)} KB</div>
+          <div>解析到車輛數: <strong>${data.car_count}</strong> 輛</div>
+          <div>總頁數: ${data.total_pages} 頁</div>
+        </div>`;
+    } else {
+      html = `<div style="color:#c00"><strong>✗ 測試失敗</strong></div>
+        <div style="margin-top:8px">
+          <div>HTTP 狀態碼: ${data.status_code || 'N/A'}</div>
+          <div>錯誤訊息: ${data.error || '未知錯誤'}</div>
+        </div>
+        <div style="margin-top:12px;padding:8px;background:#fff8e8;border-radius:4px;font-size:12px">
+          <strong>建議：</strong>可能是網站結構已變更，請檢查目前的 BASE_URL 是否正確。
+        </div>`;
+    }
+    resultDiv.innerHTML = html;
+  } catch(e) {
+    console.error('runScraperTest:', e);
+    resultDiv.innerHTML = `<div style="color:#c00">測試失敗: ${e.message}</div>`;
   }
 }
 

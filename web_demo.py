@@ -33,7 +33,7 @@ else:
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
 
 # 版本號（用於檢測更新）
-APP_VERSION = "1.5.22"
+APP_VERSION = "1.5.23"
 GITHUB_REPO = "GGC-svg/28car-system"
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
@@ -3063,6 +3063,139 @@ def api_admin_update_schedule():
             return jsonify({'success': False, 'error': result.stderr or '設定失敗，可能需要管理員權限'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/admin/scraper-config')
+@admin_required
+def api_admin_scraper_config():
+    """取得爬蟲目前的設定資訊（用於診斷）"""
+    import importlib.util
+
+    config = {
+        'base_url': None,
+        'cdn_url': None,
+        'list_urls': {},
+        'detail_urls': {},
+        'sources': {},
+        'delays': {},
+        'last_test': None,
+        'test_results': []
+    }
+
+    # 嘗試從 scraper_28car.py 讀取設定
+    scraper_path = os.path.join(BASE_DIR, 'scraper_28car.py')
+    if os.path.exists(scraper_path):
+        try:
+            # 動態載入 scraper 模組
+            spec = importlib.util.spec_from_file_location("scraper_28car", scraper_path)
+            scraper_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(scraper_module)
+
+            # 讀取設定
+            config['base_url'] = getattr(scraper_module, 'BASE_URL', 'N/A')
+            config['cdn_url'] = getattr(scraper_module, 'CDN_URL', 'N/A')
+            config['sources'] = getattr(scraper_module, 'SOURCES', {})
+
+            # 建構列表頁和詳情頁 URL 範例
+            for source, info in config['sources'].items():
+                config['list_urls'][source] = f"{config['base_url']}/{info['list_page']}"
+                config['detail_urls'][source] = f"{config['cdn_url']}/{info['detail_page']}?h_vid=EXAMPLE"
+
+            # 延遲設定
+            config['delays'] = {
+                'page_min': getattr(scraper_module, 'PAGE_DELAY_MIN', 'N/A'),
+                'page_max': getattr(scraper_module, 'PAGE_DELAY_MAX', 'N/A'),
+                'detail_min': getattr(scraper_module, 'DETAIL_DELAY_MIN', 'N/A'),
+                'detail_max': getattr(scraper_module, 'DETAIL_DELAY_MAX', 'N/A'),
+            }
+
+        except Exception as e:
+            config['error'] = f'讀取設定失敗: {str(e)}'
+
+    # 取得最近的執行記錄
+    try:
+        db = get_db()
+        recent_runs = db.execute('''
+            SELECT started_at, finished_at, status, new_cars, updated_cars, unchanged_cars, error_message
+            FROM scraper_runs ORDER BY started_at DESC LIMIT 5
+        ''').fetchall()
+        db.close()
+
+        config['recent_runs'] = [{
+            'started_at': r['started_at'],
+            'finished_at': r['finished_at'],
+            'status': r['status'],
+            'new_cars': r['new_cars'],
+            'updated_cars': r['updated_cars'],
+            'unchanged_cars': r['unchanged_cars'],
+            'error_message': r['error_message']
+        } for r in recent_runs]
+
+    except Exception as e:
+        config['recent_runs'] = []
+        log.error(f"查詢爬蟲記錄失敗: {e}")
+
+    return jsonify(config)
+
+
+@app.route('/api/admin/scraper-test', methods=['POST'])
+@admin_required
+def api_admin_scraper_test():
+    """測試爬蟲 URL 是否正常（診斷用）"""
+    import cloudscraper
+    from bs4 import BeautifulSoup
+    import re
+
+    data = request.get_json() or {}
+    test_url = data.get('url')
+
+    if not test_url:
+        # 預設測試主要列表頁
+        test_url = 'https://dj1jklak2e.28car.com/sell_lst.php'
+
+    results = {
+        'url': test_url,
+        'success': False,
+        'status_code': None,
+        'content_length': 0,
+        'car_count': 0,
+        'total_pages': 0,
+        'error': None
+    }
+
+    try:
+        session = cloudscraper.create_scraper(
+            browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+        )
+
+        resp = session.get(test_url, timeout=30)
+        results['status_code'] = resp.status_code
+        results['content_length'] = len(resp.content)
+
+        if resp.status_code == 200:
+            content = resp.content.decode('big5', errors='replace')
+            soup = BeautifulSoup(content, 'html.parser')
+
+            # 計算車輛數
+            rw_tds = soup.find_all('td', id=re.compile(r'^rw_\d+'))
+            results['car_count'] = len(rw_tds)
+
+            # 計算總頁數
+            page_match = re.search(r'genPage\((\d+),\s*\d+\)', str(soup))
+            if page_match:
+                results['total_pages'] = int(page_match.group(1))
+
+            results['success'] = results['car_count'] > 0
+
+            if results['car_count'] == 0:
+                results['error'] = '頁面載入成功但找不到車輛資料，可能網站結構已變更'
+        else:
+            results['error'] = f'HTTP 狀態碼: {resp.status_code}'
+
+    except Exception as e:
+        results['error'] = str(e)
+
+    return jsonify(results)
 
 
 @app.route('/api/admin/run-daily-scraper', methods=['POST'])

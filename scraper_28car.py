@@ -90,7 +90,7 @@ else:
     # Python 腳本執行
     _default_base = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.environ.get('APP_BASE_DIR', _default_base)
-BASE_URL = os.environ.get('APP_BASE_URL', "https://www.28car.com")
+BASE_URL = os.environ.get('APP_BASE_URL', "https://dj1jklak2e.28car.com")  # 2024-03 改用 CDN 域名
 CDN_URL = os.environ.get('APP_CDN_URL', "https://dj1jklak2e.28car.com")  # 詳情頁內容 CDN
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "cars_28car.db"))
 IMAGES_DIR = os.environ.get('IMAGES_DIR', os.path.join(BASE_DIR, "images"))
@@ -276,6 +276,8 @@ def init_db():
 class Scraper28Car:
     def __init__(self):
         # 使用 cloudscraper 繞過 Cloudflare 保護
+        # 注意：不要用 session.headers.update() 覆蓋 cloudscraper 的預設 headers
+        # 否則會導致網站返回不完整的內容
         self.session = cloudscraper.create_scraper(
             browser={
                 'browser': 'chrome',
@@ -283,12 +285,25 @@ class Scraper28Car:
                 'desktop': True,
             }
         )
-        self.session.headers.update(HEADERS)
+        # 只設定 Accept-Language，其他讓 cloudscraper 自動處理
+        self.session.headers['Accept-Language'] = 'zh-TW,zh-HK;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6'
         os.makedirs(IMAGES_DIR, exist_ok=True)
         self._shutdown = False
         # 失敗重試隊列
         self._failed_queue = []  # [(vid, source, retry_count), ...]
         self._max_retries = 3  # 最大重試次數
+        # Session 預熱：先訪問首頁建立 Cookie
+        self._warmup_session()
+
+    def _warmup_session(self):
+        """預熱 Session：訪問首頁建立 Cookie，模擬真人瀏覽"""
+        try:
+            log.info("預熱 Session...")
+            resp = self.session.get(f"{BASE_URL}/", timeout=30)
+            time.sleep(random.uniform(1.0, 2.0))
+            log.info(f"  Session 預熱完成 (cookies: {len(self.session.cookies)})")
+        except Exception as e:
+            log.warning(f"  Session 預熱失敗: {e}")
 
     def handle_shutdown(self, signum, frame):
         """優雅關閉：收到 SIGINT/SIGTERM 時完成當前任務後停止"""
@@ -296,11 +311,11 @@ class Scraper28Car:
         self._shutdown = True
 
     def _random_headers(self, referer=None):
-        """生成隨機 headers 模擬真實瀏覽器"""
-        return {
-            'User-Agent': random.choice(USER_AGENTS),
-            'Referer': referer or f'{BASE_URL}/',
-        }
+        """生成額外 headers（只設 Referer，User-Agent 讓 cloudscraper 處理）"""
+        headers = {}
+        if referer:
+            headers['Referer'] = referer
+        return headers
 
     def _fetch(self, url, timeout=30, referer=None):
         """抓取頁面，Big5 解碼（自動 retry by session adapter）"""
@@ -328,12 +343,12 @@ class Scraper28Car:
 
     # --- URL 建構輔助函數 ---
     def _list_url(self, source, page=1):
-        """建構列表頁 URL（支援 sell / cmy）"""
+        """建構列表頁 URL（支援 sell / cmy）- 2024-03 改為直接訪問"""
         list_page = SOURCES[source]['list_page']
         if page <= 1:
-            return f"{BASE_URL}/index2.php?tourl=%2F{list_page}"
+            return f"{BASE_URL}/{list_page}"
         else:
-            return f"{BASE_URL}/index2.php?tourl=%2F{list_page}%3Fh_page%3D{page}"
+            return f"{BASE_URL}/{list_page}?h_page={page}"
 
     def _detail_url(self, source, vid):
         """建構詳情頁 URL（支援 sell / cmy）- 直接使用 CDN"""
@@ -878,6 +893,13 @@ class Scraper28Car:
             log.info(f"  標記下架: {stats['stale_marked']}")
             log.info("=" * 60)
 
+            # 監控警告：連續多次更新都是 0 筆
+            if stats['new_cars'] == 0 and stats['updated_cars'] == 0:
+                log.warning("")
+                log.warning("⚠️  警告：本次更新 0 新增、0 更新")
+                log.warning("    如果連續多天都是這樣，可能網站結構已變更！")
+                log.warning(f"    請手動檢查: {BASE_URL}/sell_lst.php")
+
         except Exception as e:
             log.error(f"每日更新出錯: {e}")
             import traceback
@@ -900,7 +922,7 @@ class Scraper28Car:
     def _daily_scan_source(self, conn, source):
         """掃描單一來源系統的列表頁（每日更新用）"""
         src_name = SOURCES[source]['name']
-        result = {'pages': 0, 'cars': 0, 'new': 0, 'updated': 0, 'unchanged': 0}
+        result = {'pages': 0, 'cars': 0, 'new': 0, 'updated': 0, 'unchanged': 0, 'zero_pages': 0}
 
         # 讀取第 1 頁，取得總頁數
         url = self._list_url(source, 1)
@@ -917,6 +939,13 @@ class Scraper28Car:
         result['updated'] += page_upd
         result['unchanged'] += page_unch
 
+        # 監控：記錄 0 筆的頁面
+        consecutive_zero = 0
+        if len(cars_page) == 0:
+            consecutive_zero += 1
+            result['zero_pages'] += 1
+            log.warning(f"  [{src_name}] 第 1 頁解析到 0 輛車！可能網站結構已變更")
+
         log.info(f"  [{src_name}] 第 1/{total_pages} 頁: {len(cars_page)} 輛 "
                  f"(新:{page_new} 更新:{page_upd} 不變:{page_unch})")
 
@@ -932,6 +961,13 @@ class Scraper28Car:
             if consecutive_unchanged >= stop_threshold:
                 log.info(f"  [{src_name}] 連續 {stop_threshold} 頁無變化，"
                          f"停止掃描（第 {page-1} 頁止）")
+                break
+
+            # 監控：連續 3 頁都是 0 筆，發出嚴重警告並停止
+            if consecutive_zero >= 3:
+                log.error(f"  [{src_name}] 連續 {consecutive_zero} 頁都是 0 輛車！")
+                log.error(f"  可能原因：1) 網站結構已變更 2) IP 被封鎖 3) 網站維護中")
+                log.error(f"  建議檢查 {BASE_URL}/{SOURCES[source]['list_page']} 是否正常")
                 break
 
             self._delay()
@@ -958,10 +994,24 @@ class Scraper28Car:
                 else:
                     consecutive_unchanged = 0
 
+                # 監控：記錄連續 0 筆
+                if len(cars_page) == 0:
+                    consecutive_zero += 1
+                    result['zero_pages'] += 1
+                    log.warning(f"  [{src_name}] 第 {page} 頁解析到 0 輛車！(連續 {consecutive_zero} 頁)")
+                else:
+                    consecutive_zero = 0  # 有車則重置計數
+
             except Exception as e:
                 log.error(f"  [{src_name}] 第 {page} 頁抓取失敗: {e}")
 
             page += 1
+
+        # 掃描結束後的警告
+        if result['zero_pages'] > 0:
+            log.warning(f"  [{src_name}] 本次掃描共有 {result['zero_pages']} 頁是 0 輛車")
+            if result['cars'] == 0:
+                log.error(f"  [{src_name}] 整個來源沒有抓到任何車輛！請立即檢查網站結構")
 
         return result
 
